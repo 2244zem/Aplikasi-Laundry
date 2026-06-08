@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Plus, RefreshCw } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import type { Expense, ExpenseCategory, MonthlyBalance, UserProfile } from '@/lib/types';
 
@@ -144,7 +143,7 @@ export function AdminFinancePanel({ profile }: Props) {
           <div className="actions">
             <input className="input" onChange={(event) => setPeriod(event.target.value)} type="month" value={period} />
             <button className="button secondary" disabled={loading} onClick={loadFinance} type="button">
-              <RefreshCw aria-hidden size={18} />
+              <i className="fi fi-rr-refresh" aria-hidden />
               Refresh
             </button>
           </div>
@@ -173,16 +172,23 @@ export function AdminFinancePanel({ profile }: Props) {
             <h2>Catat biaya operasional</h2>
           </div>
 
-          <label className="field">
+          <div className="field">
             <span>Kategori</span>
-            <select className="select" onChange={(event) => setCategory(event.target.value as ExpenseCategory)} value={category}>
+            <div className="choice-grid finance-category-grid" role="listbox" aria-label="Kategori pengeluaran">
               {categories.map((item) => (
-                <option key={item} value={item}>
+                <button
+                  aria-selected={category === item}
+                  className={`choice-pill ${category === item ? 'active' : ''}`}
+                  key={item}
+                  onClick={() => setCategory(item)}
+                  type="button"
+                >
+                  <i className="fi fi-rr-tag" aria-hidden />
                   {item}
-                </option>
+                </button>
               ))}
-            </select>
-          </label>
+            </div>
+          </div>
 
           <label className="field">
             <span>Nominal</span>
@@ -203,7 +209,7 @@ export function AdminFinancePanel({ profile }: Props) {
           </label>
 
           <button className="button primary" disabled={loading} type="submit">
-            <Plus aria-hidden size={18} />
+            <i className="fi fi-rr-plus" aria-hidden />
             Simpan Pengeluaran
           </button>
         </form>

@@ -135,6 +135,12 @@ function OrderCard({ order, profile, onChange, onOpenChat }: OrderRowProps) {
   const canEdit = order.admin_outlet_id === profile.id || profile.role === 'SUPERADMIN';
   const statusIndex = Math.max(0, statusOptions.indexOf(order.status_order));
 
+  useEffect(() => {
+    setBeratKg(Number(order.berat_kg ?? 0));
+    setTotalHarga(Number(order.total_harga ?? 0));
+    setStatusOrder(order.status_order);
+  }, [order.berat_kg, order.id, order.status_order, order.total_harga]);
+
   async function claimOrder() {
     setSaving(true);
     setMessage('');
@@ -252,18 +258,20 @@ function OrderCard({ order, profile, onChange, onOpenChat }: OrderRowProps) {
 
       <div className="ticket-actions">
         <div className="ticket-status-control">
-          <select
-            className="select"
-            disabled={!canEdit}
-            onChange={(event) => setStatusOrder(event.target.value as LaundryOrder['status_order'])}
-            value={statusOrder}
-          >
+          <div className="choice-grid status-choice-grid" role="listbox" aria-label="Ubah status order">
             {statusOptions.map((status) => (
-              <option key={status} value={status}>
-                {status}
-              </option>
+              <button
+                aria-selected={statusOrder === status}
+                className={`choice-pill ${statusOrder === status ? 'active' : ''}`}
+                disabled={!canEdit}
+                key={status}
+                onClick={() => setStatusOrder(status)}
+                type="button"
+              >
+                {status.replace('PENDING_CONFIRMATION', 'PENDING')}
+              </button>
             ))}
-          </select>
+          </div>
         </div>
         <div className="actions">
           {canClaim ? (

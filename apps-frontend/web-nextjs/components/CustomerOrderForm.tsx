@@ -4,7 +4,7 @@ import type { CSSProperties } from 'react';
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
-import type { UserProfile } from '@/lib/types';
+import type { LaundryOrder, UserProfile } from '@/lib/types';
 
 type Props = {
   profile: UserProfile;
@@ -39,6 +39,8 @@ const serviceOptions = [
   { icon: 'fi-rr-iron', label: 'Setrika Saja', min: 'Rapi lipat' },
   { icon: 'fi-rr-bolt', label: 'Express 6 Jam', min: 'Prioritas' },
 ];
+
+const orderSteps: LaundryOrder['status_order'][] = ['PENDING_CONFIRMATION', 'DITERIMA', 'DICUCI', 'DISETRIKA', 'SELESAI'];
 
 function isActiveOutlet(outlet: OutletProfile) {
   if (outlet.role === 'SUPERADMIN') {
@@ -78,6 +80,19 @@ function distanceKm(from: UserLocation | null, outlet: OutletProfile) {
   return radiusKm * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
+function orderStatusLabel(status: LaundryOrder['status_order']) {
+  return status === 'PENDING_CONFIRMATION' ? 'PENDING' : status;
+}
+
+function upsertOrderList(currentOrders: LaundryOrder[], nextOrder: LaundryOrder) {
+  const exists = currentOrders.some((order) => order.id === nextOrder.id);
+  const nextOrders = exists
+    ? currentOrders.map((order) => (order.id === nextOrder.id ? nextOrder : order))
+    : [nextOrder, ...currentOrders];
+
+  return nextOrders.slice(0, 5);
+}
+
 export function CustomerOrderForm({ profile }: Props) {
   const [paket, setPaket] = useState('Cuci Setrika');
   const [estimasiPakaian, setEstimasiPakaian] = useState(12);
@@ -90,6 +105,8 @@ export function CustomerOrderForm({ profile }: Props) {
   const [locationMessage, setLocationMessage] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [loadingOutlets, setLoadingOutlets] = useState(true);
+  const [ordersLoading, setOrdersLoading] = useState(true);
+  const [activeOrders, setActiveOrders] = useState<LaundryOrder[]>([]);
   const [message, setMessage] = useState('');
   const [createdOrderId, setCreatedOrderId] = useState('');
 
@@ -156,6 +173,69 @@ export function CustomerOrderForm({ profile }: Props) {
     };
   }, []);
 
+  useEffect(() => {
+    let mounted = true;
+
+    async function loadActiveOrders() {
+      setOrdersLoading(true);
+
+      const { data, error } = await supabase
+        .from('tabel_order')
+        .select('*')
+        .eq('user_id', profile.id)
+        .order('created_at', { ascending: false })
+        .limit(5);
+
+      if (!mounted) {
+        return;
+      }
+
+      setOrdersLoading(false);
+
+      if (error) {
+        setMessage(error.message);
+        return;
+      }
+
+      setActiveOrders((data ?? []) as LaundryOrder[]);
+    }
+
+    void loadActiveOrders();
+
+    const channel = supabase
+      .channel(`scale-wash:user-orders:${profile.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          filter: `user_id=eq.${profile.id}`,
+          schema: 'public',
+          table: 'tabel_order',
+        },
+        (payload) => {
+          setActiveOrders((currentOrders) => upsertOrderList(currentOrders, payload.new as LaundryOrder));
+        },
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          filter: `user_id=eq.${profile.id}`,
+          schema: 'public',
+          table: 'tabel_order',
+        },
+        (payload) => {
+          setActiveOrders((currentOrders) => upsertOrderList(currentOrders, payload.new as LaundryOrder));
+        },
+      )
+      .subscribe();
+
+    return () => {
+      mounted = false;
+      void supabase.removeChannel(channel);
+    };
+  }, [profile.id]);
+
   function requestLocation() {
     setLocationMessage('');
 
@@ -209,7 +289,7 @@ export function CustomerOrderForm({ profile }: Props) {
         status_order: 'PENDING_CONFIRMATION',
         status_pembayaran: 'UNPAID',
       })
-      .select('id')
+      .select('*')
       .single();
 
     setSubmitting(false);
@@ -219,7 +299,9 @@ export function CustomerOrderForm({ profile }: Props) {
       return;
     }
 
-    setCreatedOrderId(data.id);
+    const nextOrder = data as LaundryOrder;
+    setCreatedOrderId(nextOrder.id);
+    setActiveOrders((currentOrders) => upsertOrderList(currentOrders, nextOrder));
     setMessage(`Order terkirim ke ${outletName(selectedOutlet)}.`);
     setAlamat('');
     setCatatan('');
@@ -405,6 +487,54 @@ export function CustomerOrderForm({ profile }: Props) {
             <p>Paket: {paket}</p>
             <p>Estimasi: {estimasiPakaian} pcs</p>
             <p>Status: PENDING_CONFIRMATION</p>
+          </div>
+        </div>
+
+        <div className="app-card live-status-card">
+          <div className="section-heading compact">
+            <div>
+              <p className="eyebrow">Realtime</p>
+              <h2>Status order kamu</h2>
+            </div>
+            <span className="status active">{activeOrders.length} live</span>
+          </div>
+
+          <div className="customer-order-list">
+            {ordersLoading ? <p className="muted">Memuat status order...</p> : null}
+            {!ordersLoading && activeOrders.length === 0 ? (
+              <div className="empty-state compact">
+                <i className="fi fi-rr-ballot" aria-hidden />
+                <strong>Belum ada order</strong>
+                <span>Order baru akan muncul realtime di sini.</span>
+              </div>
+            ) : null}
+
+            {activeOrders.map((order) => {
+              const currentIndex = orderSteps.indexOf(order.status_order);
+
+              return (
+                <article className="customer-status-card" key={order.id}>
+                  <div>
+                    <strong>#{order.id.slice(0, 8)}</strong>
+                    <span>{order.format_detail?.outlet_name || 'Outlet laundry'}</span>
+                  </div>
+                  <span className={`status ${order.status_order === 'SELESAI' ? 'done' : 'pending'}`}>
+                    {orderStatusLabel(order.status_order)}
+                  </span>
+                  <div className="status-rail">
+                    {orderSteps.map((status, index) => (
+                      <span className={index <= currentIndex ? 'active' : ''} key={status}>
+                        {orderStatusLabel(status)}
+                      </span>
+                    ))}
+                  </div>
+                  <Link className="button secondary" href={`/orders/${order.id}/chat`}>
+                    <i className="fi fi-rr-comment-alt" aria-hidden />
+                    Chat & detail
+                  </Link>
+                </article>
+              );
+            })}
           </div>
         </div>
       </aside>
