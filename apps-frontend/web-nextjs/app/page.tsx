@@ -16,6 +16,11 @@ const features = [
     title: 'Chat & status live',
     body: 'User melihat perubahan status dan chat bukti pakaian di satu layar.',
   },
+  {
+    icon: 'fi-rr-box-open',
+    title: 'Inventory outlet',
+    body: 'Admin bisa pantau detergen, parfum, plastik, dan stok minimum dari Supabase.',
+  },
 ];
 
 const shopCards = [
@@ -43,6 +48,18 @@ const workflowCards = [
     title: 'Progress realtime',
     body: 'Status admin tampil di sisi user dengan progress bar dan live chat.',
   },
+  {
+    href: '/orders/history',
+    icon: 'fi-rr-ballot',
+    title: 'Riwayat order user',
+    body: 'Timeline order, tagihan, dan tombol chat mengikuti pola app referensi.',
+  },
+  {
+    href: '/admin/inventory',
+    icon: 'fi-rr-box-open',
+    title: 'Stok operasional',
+    body: 'Inventory admin untuk detergen, parfum, plastik, dan item outlet lainnya.',
+  },
 ];
 
 export default function HomePage() {
@@ -68,6 +85,12 @@ export default function HomePage() {
                 <i className="fi fi-rr-apps" aria-hidden />
               </span>
               Dashboard Admin
+            </Link>
+            <Link className="button secondary" href="/orders/history">
+              <span className="motion-icon">
+                <i className="fi fi-rr-ballot" aria-hidden />
+              </span>
+              Riwayat
             </Link>
           </div>
 

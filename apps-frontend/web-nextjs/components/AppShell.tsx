@@ -8,8 +8,11 @@ type DeviceMode = 'android' | 'tablet' | 'desktop' | null;
 
 const navItems = [
   { href: '/', icon: 'fi-rr-home', label: 'Home', matches: (path: string) => path === '/' },
-  { href: '/orders/new', icon: 'fi-rr-add-document', label: 'Order', matches: (path: string) => path.startsWith('/orders') },
+  { href: '/orders/new', icon: 'fi-rr-add-document', label: 'Order', matches: (path: string) => path === '/orders/new' },
+  { href: '/orders/history', icon: 'fi-rr-ballot', label: 'History', matches: (path: string) => path.startsWith('/orders/history') },
+  { href: '/orders/payment', icon: 'fi-rr-credit-card', label: 'Pay', matches: (path: string) => path.startsWith('/orders/payment') },
   { href: '/admin/dashboard', icon: 'fi-rr-apps', label: 'Admin', matches: (path: string) => path.startsWith('/admin/dashboard') },
+  { href: '/admin/inventory', icon: 'fi-rr-box-open', label: 'Stock', matches: (path: string) => path.startsWith('/admin/inventory') },
   { href: '/admin/finance', icon: 'fi-rr-receipt', label: 'Finance', matches: (path: string) => path.startsWith('/admin/finance') },
 ];
 

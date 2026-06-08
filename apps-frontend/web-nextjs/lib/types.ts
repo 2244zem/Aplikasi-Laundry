@@ -88,3 +88,16 @@ export type MonthlyBalance = {
   pendapatan_bersih: number;
   updated_at: string;
 };
+
+export type InventoryItem = {
+  id: string;
+  admin_id: string;
+  nama_barang: string;
+  kategori: string;
+  stok: number;
+  satuan: string;
+  stok_minimum: number;
+  catatan: string | null;
+  created_at: string;
+  updated_at: string;
+};
