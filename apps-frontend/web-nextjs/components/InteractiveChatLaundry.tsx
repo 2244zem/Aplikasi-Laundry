@@ -2,12 +2,12 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
-import { ImagePlus, Send, X } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
-import type { ChatMessage, UserProfile } from '@/lib/types';
+import type { ChatMessage, LaundryOrder, UserProfile } from '@/lib/types';
 
 const CHAT_BUCKET = 'bukti-cucian';
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
+const orderSteps: LaundryOrder['status_order'][] = ['PENDING_CONFIRMATION', 'DITERIMA', 'DICUCI', 'DISETRIKA', 'SELESAI'];
 
 type Props = {
   orderId: string;
@@ -26,7 +26,12 @@ function messageTime(createdAt: string) {
   }).format(new Date(createdAt));
 }
 
+function orderStatusLabel(status: LaundryOrder['status_order']) {
+  return status === 'PENDING_CONFIRMATION' ? 'PENDING' : status;
+}
+
 export function InteractiveChatLaundry({ orderId, profile }: Props) {
+  const [order, setOrder] = useState<LaundryOrder | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [textInput, setTextInput] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -35,6 +40,17 @@ export function InteractiveChatLaundry({ orderId, profile }: Props) {
   const logRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
+    async function fetchOrder() {
+      const { data, error } = await supabase.from('tabel_order').select('*').eq('id', orderId).maybeSingle();
+
+      if (error) {
+        setErrorMessage(error.message);
+        return;
+      }
+
+      setOrder((data as LaundryOrder | null) ?? null);
+    }
+
     async function fetchChatHistory() {
       const { data, error } = await supabase
         .from('tabel_chat_message')
@@ -50,6 +66,7 @@ export function InteractiveChatLaundry({ orderId, profile }: Props) {
       setMessages((data ?? []) as ChatMessage[]);
     }
 
+    void fetchOrder();
     void fetchChatHistory();
 
     const chatRoom = supabase
@@ -75,8 +92,25 @@ export function InteractiveChatLaundry({ orderId, profile }: Props) {
       )
       .subscribe();
 
+    const orderRoom = supabase
+      .channel(`scale-wash:order-status:${orderId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'tabel_order',
+          filter: `id=eq.${orderId}`,
+        },
+        (payload) => {
+          setOrder(payload.new as LaundryOrder);
+        },
+      )
+      .subscribe();
+
     return () => {
       void supabase.removeChannel(chatRoom);
+      void supabase.removeChannel(orderRoom);
     };
   }, [orderId]);
 
@@ -170,83 +204,115 @@ export function InteractiveChatLaundry({ orderId, profile }: Props) {
   }
 
   return (
-    <section className="chat-shell">
-      <div className="page-header" style={{ marginBottom: 12 }}>
-        <div>
-          <p className="eyebrow">Live chat</p>
-          <h2>Bukti fisik & kondisi pakaian</h2>
+    <section className="chat-screen">
+      <div className="chat-status-card">
+        <div className="section-heading compact">
+          <div>
+            <p className="eyebrow">Order status</p>
+            <h1>#{orderId.slice(0, 8)}</h1>
+            <p className="muted">
+              {order?.format_detail?.outlet_name || 'Outlet'} · {order?.format_detail?.paket || 'Laundry'}
+            </p>
+          </div>
+          <span className={`status ${order?.status_order === 'SELESAI' ? 'done' : 'pending'}`}>
+            {order ? orderStatusLabel(order.status_order) : 'LOADING'}
+          </span>
         </div>
-        <span className="status active">{messages.length} pesan</span>
+
+        <div className="status-rail large" aria-label="Progress order customer">
+          {orderSteps.map((status) => {
+            const currentIndex = order ? orderSteps.indexOf(order.status_order) : -1;
+            const stepIndex = orderSteps.indexOf(status);
+
+            return (
+              <span className={stepIndex <= currentIndex ? 'active' : ''} key={status}>
+                {orderStatusLabel(status)}
+              </span>
+            );
+          })}
+        </div>
       </div>
 
-      <div className="chat-log" ref={logRef}>
-        {messages.length === 0 ? (
-          <p className="muted" style={{ margin: 0 }}>
-            Belum ada percakapan untuk order ini.
-          </p>
-        ) : null}
+      <div className="chat-shell">
+        <div className="section-heading compact">
+          <div>
+            <p className="eyebrow">Live chat</p>
+            <h2>Bukti fisik & kondisi pakaian</h2>
+          </div>
+          <span className="status active">{messages.length} pesan</span>
+        </div>
 
-        {messages.map((message) => {
-          const isMine = message.sender_user_id === profile.id;
+        <div className="chat-log" ref={logRef}>
+          {messages.length === 0 ? (
+            <div className="empty-state compact">
+              <i className="fi fi-rr-comment-alt" aria-hidden />
+              <strong>Belum ada chat</strong>
+              <span>Kirim pesan atau foto kondisi pakaian di sini.</span>
+            </div>
+          ) : null}
 
-          return (
-            <article className={`chat-message ${isMine ? 'mine' : ''}`} key={message.id}>
-              <div className={`chat-bubble ${isMine ? 'mine' : ''}`}>
-                {message.message ? <p>{message.message}</p> : null}
-                {message.attachment_url ? (
-                  <a href={message.attachment_url} rel="noreferrer" target="_blank">
-                    <Image
-                      alt="Lampiran bukti cucian"
-                      className="chat-image"
-                      height={180}
-                      src={message.attachment_url}
-                      unoptimized
-                      width={260}
-                    />
-                  </a>
-                ) : null}
-                <time>{messageTime(message.created_at)}</time>
-              </div>
-            </article>
-          );
-        })}
-      </div>
+          {messages.map((message) => {
+            const isMine = message.sender_user_id === profile.id;
 
-      <form className="chat-compose" onSubmit={handleSendPayload}>
-        {selectedFile ? (
-          <div className="file-chip">
-            <ImagePlus aria-hidden size={16} />
-            <span>{selectedFile.name}</span>
-            <button aria-label="Hapus lampiran" onClick={() => setSelectedFile(null)} type="button">
-              <X aria-hidden size={15} />
+            return (
+              <article className={`chat-message ${isMine ? 'mine' : ''}`} key={message.id}>
+                <div className={`chat-bubble ${isMine ? 'mine' : ''}`}>
+                  {message.message ? <p>{message.message}</p> : null}
+                  {message.attachment_url ? (
+                    <a href={message.attachment_url} rel="noreferrer" target="_blank">
+                      <Image
+                        alt="Lampiran bukti cucian"
+                        className="chat-image"
+                        height={180}
+                        src={message.attachment_url}
+                        unoptimized
+                        width={260}
+                      />
+                    </a>
+                  ) : null}
+                  <time>{messageTime(message.created_at)}</time>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+
+        <form className="chat-compose" onSubmit={handleSendPayload}>
+          {selectedFile ? (
+            <div className="file-chip">
+              <i className="fi fi-rr-picture" aria-hidden />
+              <span>{selectedFile.name}</span>
+              <button aria-label="Hapus lampiran" onClick={() => setSelectedFile(null)} type="button">
+                <i className="fi fi-rr-cross-small" aria-hidden />
+              </button>
+            </div>
+          ) : null}
+
+          <div className="chat-input-row">
+            <label className="button secondary" htmlFor={`chat-file-${orderId}`}>
+              <i className="fi fi-rr-picture" aria-hidden />
+              Foto
+            </label>
+            <input
+              accept="image/*"
+              id={`chat-file-${orderId}`}
+              onChange={handleFileChange}
+              style={{ display: 'none' }}
+              type="file"
+            />
+            <input
+              className="input"
+              onChange={(event) => setTextInput(event.target.value)}
+              placeholder="Ketik pesan konfirmasi kondisi kain"
+              value={textInput}
+            />
+            <button className="button primary" disabled={uploading} type="submit">
+              <i className="fi fi-rr-paper-plane" aria-hidden />
+              {uploading ? 'Mengirim' : 'Kirim'}
             </button>
           </div>
-        ) : null}
-
-        <div className="chat-input-row">
-          <label className="button secondary" htmlFor={`chat-file-${orderId}`}>
-            <ImagePlus aria-hidden size={18} />
-            Foto
-          </label>
-          <input
-            accept="image/*"
-            id={`chat-file-${orderId}`}
-            onChange={handleFileChange}
-            style={{ display: 'none' }}
-            type="file"
-          />
-          <input
-            className="input"
-            onChange={(event) => setTextInput(event.target.value)}
-            placeholder="Ketik pesan konfirmasi kondisi kain"
-            value={textInput}
-          />
-          <button className="button primary" disabled={uploading} type="submit">
-            <Send aria-hidden size={18} />
-            {uploading ? 'Mengirim' : 'Kirim'}
-          </button>
-        </div>
-      </form>
+        </form>
+      </div>
 
       {errorMessage ? <div className="alert error">{errorMessage}</div> : null}
     </section>

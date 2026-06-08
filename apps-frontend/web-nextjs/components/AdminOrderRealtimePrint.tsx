@@ -1,7 +1,7 @@
 'use client';
 
+import type { CSSProperties } from 'react';
 import { useEffect, useState } from 'react';
-import { Check, MessageCircle, Printer, RefreshCw, Save } from 'lucide-react';
 import { InteractiveChatLaundry } from '@/components/InteractiveChatLaundry';
 import { supabase } from '@/lib/supabaseClient';
 import type { LaundryOrder, UserProfile } from '@/lib/types';
@@ -124,7 +124,7 @@ type OrderRowProps = {
   onOpenChat: (order: LaundryOrder) => void;
 };
 
-function OrderRow({ order, profile, onChange, onOpenChat }: OrderRowProps) {
+function OrderCard({ order, profile, onChange, onOpenChat }: OrderRowProps) {
   const [beratKg, setBeratKg] = useState(Number(order.berat_kg ?? 0));
   const [totalHarga, setTotalHarga] = useState(Number(order.total_harga ?? 0));
   const [statusOrder, setStatusOrder] = useState<LaundryOrder['status_order']>(order.status_order);
@@ -133,6 +133,7 @@ function OrderRow({ order, profile, onChange, onOpenChat }: OrderRowProps) {
   const detail = order.format_detail ?? {};
   const canClaim = !order.admin_outlet_id;
   const canEdit = order.admin_outlet_id === profile.id || profile.role === 'SUPERADMIN';
+  const statusIndex = Math.max(0, statusOptions.indexOf(order.status_order));
 
   async function claimOrder() {
     setSaving(true);
@@ -187,27 +188,44 @@ function OrderRow({ order, profile, onChange, onOpenChat }: OrderRowProps) {
   }
 
   return (
-    <tr>
-      <td>
-        <strong>{order.id.slice(0, 8)}</strong>
-        <p className="muted" style={{ margin: '4px 0 0' }}>
-          {new Date(order.created_at).toLocaleString('id-ID')}
-        </p>
-      </td>
-      <td>
-        <strong>{detail.paket ?? '-'}</strong>
-        <p className="muted" style={{ margin: '4px 0 0' }}>
-          {detail.estimasi_pakaian ?? '-'} pcs - {detail.alamat ?? '-'}
-        </p>
-      </td>
-      <td>
-        <span className={statusClass(order)}>{order.status_order}</span>
-        <p className="muted" style={{ margin: '8px 0 0' }}>
-          {order.status_pembayaran}
-        </p>
-      </td>
-      <td>
-        <div className="form-grid" style={{ gap: 8 }}>
+    <article className="order-ticket">
+      <div className="ticket-head">
+        <div>
+          <span className="ticket-id">#{order.id.slice(0, 8)}</span>
+          <h3>{detail.paket ?? 'Laundry order'}</h3>
+          <p className="muted">{new Date(order.created_at).toLocaleString('id-ID')}</p>
+        </div>
+        <div className="ticket-status-stack">
+          <span className={statusClass(order)}>{order.status_order}</span>
+          <span className="status subtle">{order.status_pembayaran}</span>
+        </div>
+      </div>
+
+      <div className="ticket-body">
+        <div className="ticket-info">
+          <span>
+            <i className="fi fi-rr-shirt-long-sleeve" aria-hidden />
+            {detail.estimasi_pakaian ?? '-'} pcs
+          </span>
+          <span>
+            <i className="fi fi-rr-map-marker-home" aria-hidden />
+            {detail.alamat ?? '-'}
+          </span>
+          <span>
+            <i className="fi fi-rr-clock-three" aria-hidden />
+            {detail.pickup_time || 'Pickup fleksibel'}
+          </span>
+        </div>
+
+        <div className="status-rail" aria-label="Progress order">
+          {statusOptions.slice(0, 5).map((status, index) => (
+            <span className={index <= statusIndex ? 'active' : ''} key={status}>
+              {status.replace('PENDING_CONFIRMATION', 'PENDING')}
+            </span>
+          ))}
+        </div>
+
+        <div className="ticket-edit">
           <input
             className="input"
             disabled={!canEdit}
@@ -228,11 +246,12 @@ function OrderRow({ order, profile, onChange, onOpenChat }: OrderRowProps) {
             type="number"
             value={totalHarga}
           />
-          <span className="muted">{formatCurrency(totalHarga)}</span>
+          <strong>{formatCurrency(totalHarga)}</strong>
         </div>
-      </td>
-      <td>
-        <div className="form-grid" style={{ gap: 8 }}>
+      </div>
+
+      <div className="ticket-actions">
+        <div className="ticket-status-control">
           <select
             className="select"
             disabled={!canEdit}
@@ -245,30 +264,182 @@ function OrderRow({ order, profile, onChange, onOpenChat }: OrderRowProps) {
               </option>
             ))}
           </select>
-          <div className="actions">
-            {canClaim ? (
-              <button className="button secondary" disabled={saving} onClick={claimOrder} type="button">
-                <Check aria-hidden size={16} />
-                Claim
-              </button>
-            ) : null}
-            <button className="button primary" disabled={!canEdit || saving} onClick={saveOrder} type="button">
-              <Save aria-hidden size={16} />
-              Simpan
+        </div>
+        <div className="actions">
+          {canClaim ? (
+            <button className="button secondary" disabled={saving} onClick={claimOrder} type="button">
+              <i className="fi fi-rr-badge-check" aria-hidden />
+              Claim
             </button>
-            <button className="button secondary" onClick={() => printOrder(order)} type="button">
-              <Printer aria-hidden size={16} />
-              Print
-            </button>
-            <button className="button secondary" onClick={() => onOpenChat(order)} type="button">
-              <MessageCircle aria-hidden size={16} />
-              Chat
+          ) : null}
+          <button className="button primary" disabled={!canEdit || saving} onClick={saveOrder} type="button">
+            <i className="fi fi-rr-disk" aria-hidden />
+            Simpan
+          </button>
+          <button className="button secondary" onClick={() => printOrder(order)} type="button">
+            <i className="fi fi-rr-print" aria-hidden />
+            Print
+          </button>
+          <button className="button secondary" onClick={() => onOpenChat(order)} type="button">
+            <i className="fi fi-rr-comment-alt" aria-hidden />
+            Chat
+          </button>
+        </div>
+      </div>
+      {message ? <small className="ticket-message">{message}</small> : null}
+    </article>
+  );
+}
+
+function AdminOutletStudio({ profile }: Props) {
+  const [namaToko, setNamaToko] = useState(profile.nama_toko || `Laundry ${profile.nama}`);
+  const [alamatToko, setAlamatToko] = useState(profile.alamat_toko || '');
+  const [latitude, setLatitude] = useState(profile.outlet_latitude?.toString() || '');
+  const [longitude, setLongitude] = useState(profile.outlet_longitude?.toString() || '');
+  const [flyerTitle, setFlyerTitle] = useState(profile.flyer_title || 'Cuci cepat, wangi tahan lama');
+  const [flyerBody, setFlyerBody] = useState(
+    profile.flyer_body || 'Promo member aktif: pickup prioritas, nota otomatis, dan chat bukti kondisi pakaian.',
+  );
+  const [flyerAccent, setFlyerAccent] = useState(profile.flyer_accent || '#20bdd6');
+  const [flyerDiscount, setFlyerDiscount] = useState(profile.flyer_discount_label || 'Diskon 20%');
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState('');
+
+  function useCurrentLocation() {
+    setMessage('');
+
+    if (!navigator.geolocation) {
+      setMessage('Browser belum mendukung lokasi.');
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setLatitude(position.coords.latitude.toFixed(7));
+        setLongitude(position.coords.longitude.toFixed(7));
+        setMessage('Lokasi outlet diambil dari posisi device ini.');
+      },
+      () => setMessage('Izin lokasi ditolak. Isi latitude/longitude manual.'),
+      { enableHighAccuracy: true, timeout: 10000 },
+    );
+  }
+
+  async function saveOutletProfile() {
+    setSaving(true);
+    setMessage('');
+
+    const { error } = await supabase
+      .from('tabel_user')
+      .update({
+        nama_toko: namaToko,
+        alamat_toko: alamatToko,
+        outlet_latitude: latitude ? Number(latitude) : null,
+        outlet_longitude: longitude ? Number(longitude) : null,
+        flyer_title: flyerTitle,
+        flyer_body: flyerBody,
+        flyer_accent: flyerAccent,
+        flyer_discount_label: flyerDiscount,
+      })
+      .eq('id', profile.id);
+
+    setSaving(false);
+
+    if (error) {
+      setMessage(error.message);
+      return;
+    }
+
+    setMessage('Profil outlet dan flyer disimpan.');
+  }
+
+  return (
+    <section className="admin-studio">
+      <div className="membership-card">
+        <span className="ad-pill">Membership {profile.status_langganan}</span>
+        <h2>{namaToko}</h2>
+        <p>{alamatToko || 'Isi alamat outlet supaya customer lebih percaya dan lokasi bisa dihitung.'}</p>
+        <div className="membership-meta">
+          <span>
+            <i className="fi fi-rr-crown" aria-hidden />
+            {profile.role}
+          </span>
+          <span>
+            <i className="fi fi-rr-calendar-clock" aria-hidden />
+            {profile.tgl_kadaluwarsa_langganan
+              ? new Date(profile.tgl_kadaluwarsa_langganan).toLocaleDateString('id-ID')
+              : 'Tanpa kadaluwarsa'}
+          </span>
+        </div>
+      </div>
+
+      <div className="flyer-editor app-card">
+        <div className="section-heading compact">
+          <div>
+            <p className="eyebrow">Flyer outlet</p>
+            <h2>Design iklan toko</h2>
+          </div>
+          <button className="button secondary" onClick={saveOutletProfile} type="button" disabled={saving}>
+            <i className="fi fi-rr-disk" aria-hidden />
+            {saving ? 'Menyimpan' : 'Simpan'}
+          </button>
+        </div>
+
+        <div className="flyer-grid">
+          <div className="form-grid">
+            <label className="field">
+              <span>Nama toko</span>
+              <input className="input" onChange={(event) => setNamaToko(event.target.value)} value={namaToko} />
+            </label>
+            <label className="field">
+              <span>Alamat toko</span>
+              <textarea className="textarea compact" onChange={(event) => setAlamatToko(event.target.value)} value={alamatToko} />
+            </label>
+            <div className="grid two equal">
+              <label className="field">
+                <span>Latitude</span>
+                <input className="input" onChange={(event) => setLatitude(event.target.value)} value={latitude} />
+              </label>
+              <label className="field">
+                <span>Longitude</span>
+                <input className="input" onChange={(event) => setLongitude(event.target.value)} value={longitude} />
+              </label>
+            </div>
+            <button className="button secondary" onClick={useCurrentLocation} type="button">
+              <i className="fi fi-rr-location-crosshairs" aria-hidden />
+              Pakai lokasi device
             </button>
           </div>
-          {message ? <small className="muted">{message}</small> : null}
+
+          <div className="form-grid">
+            <label className="field">
+              <span>Judul flyer</span>
+              <input className="input" onChange={(event) => setFlyerTitle(event.target.value)} value={flyerTitle} />
+            </label>
+            <label className="field">
+              <span>Isi promo</span>
+              <textarea className="textarea compact" onChange={(event) => setFlyerBody(event.target.value)} value={flyerBody} />
+            </label>
+            <div className="grid two equal">
+              <label className="field">
+                <span>Label promo</span>
+                <input className="input" onChange={(event) => setFlyerDiscount(event.target.value)} value={flyerDiscount} />
+              </label>
+              <label className="field">
+                <span>Warna</span>
+                <input className="input color-input" onChange={(event) => setFlyerAccent(event.target.value)} type="color" value={flyerAccent} />
+              </label>
+            </div>
+          </div>
         </div>
-      </td>
-    </tr>
+
+        <div className="ad-card mini" style={{ '--ad-accent': flyerAccent } as CSSProperties}>
+          <span className="ad-pill">{flyerDiscount}</span>
+          <h3>{flyerTitle}</h3>
+          <p>{flyerBody}</p>
+        </div>
+        {message ? <div className={`alert ${message.includes('disimpan') ? 'success' : 'error'}`}>{message}</div> : null}
+      </div>
+    </section>
   );
 }
 
@@ -354,6 +525,17 @@ export function AdminOrderRealtimePrint({ profile }: Props) {
           }
         },
       )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'tabel_order',
+        },
+        (payload) => {
+          upsertOrder(payload.new as LaundryOrder);
+        },
+      )
       .subscribe();
 
     return () => {
@@ -374,24 +556,24 @@ export function AdminOrderRealtimePrint({ profile }: Props) {
   }
 
   return (
-    <div className="grid">
-      <section className="panel soft">
-        <div className="page-header" style={{ marginBottom: 0 }}>
+    <div className="grid admin-dashboard">
+      <AdminOutletStudio profile={profile} />
+
+      <section className="ops-hero">
+        <div className="page-header">
           <div>
             <p className="eyebrow">Dashboard outlet</p>
             <h1>Order realtime & POS print</h1>
-            <p className="muted" style={{ marginBottom: 0 }}>
-              {printerStatus}
-            </p>
+            <p>{printerStatus}</p>
           </div>
           <div className="actions">
             <button className="button secondary" disabled={loading} onClick={loadOrders} type="button">
-              <RefreshCw aria-hidden size={18} />
+              <i className="fi fi-rr-refresh" aria-hidden />
               Refresh
             </button>
             {lastOrder ? (
               <button className="button primary" onClick={() => printOrder(lastOrder)} type="button">
-                <Printer aria-hidden size={18} />
+                <i className="fi fi-rr-print" aria-hidden />
                 Cetak Ulang
               </button>
             ) : null}
@@ -399,49 +581,34 @@ export function AdminOrderRealtimePrint({ profile }: Props) {
         </div>
       </section>
 
-      <section className="panel">
+      <section className="app-card">
         <div className="page-header">
           <div>
             <p className="eyebrow">Antrian order</p>
-            <h2>Pesanan masuk</h2>
+            <h2>Pesanan masuk ke outlet kamu</h2>
           </div>
           <span className="status active">{orders.length} order</span>
         </div>
 
         {errorMessage ? <div className="alert error">{errorMessage}</div> : null}
 
-        <div className="table-wrap">
-          <table className="table">
-            <thead>
-              <tr>
-                <th>Nota</th>
-                <th>Detail</th>
-                <th>Status</th>
-                <th>Berat & harga</th>
-                <th>Aksi</th>
-              </tr>
-            </thead>
-            <tbody>
-              {orders.map((order) => (
-                <OrderRow
-                  key={order.id}
-                  order={order}
-                  profile={profile}
-                  onChange={upsertOrder}
-                  onOpenChat={setSelectedChatOrder}
-                />
-              ))}
-              {!loading && orders.length === 0 ? (
-                <tr>
-                  <td colSpan={5}>
-                    <p className="muted" style={{ margin: 0 }}>
-                      Belum ada order dalam antrian outlet ini.
-                    </p>
-                  </td>
-                </tr>
-              ) : null}
-            </tbody>
-          </table>
+        <div className="order-board">
+          {orders.map((order) => (
+            <OrderCard
+              key={order.id}
+              order={order}
+              profile={profile}
+              onChange={upsertOrder}
+              onOpenChat={setSelectedChatOrder}
+            />
+          ))}
+          {!loading && orders.length === 0 ? (
+            <div className="empty-state">
+              <i className="fi fi-rr-ballot" aria-hidden />
+              <strong>Belum ada pesanan</strong>
+              <span>Order akan muncul ketika customer memilih outlet ini.</span>
+            </div>
+          ) : null}
         </div>
       </section>
 

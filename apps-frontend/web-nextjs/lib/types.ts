@@ -6,6 +6,14 @@ export type UserProfile = {
   role: 'USER' | 'ADMIN' | 'SUPERADMIN';
   status_langganan: 'ACTIVE' | 'INACTIVE';
   tgl_kadaluwarsa_langganan: string | null;
+  nama_toko: string | null;
+  alamat_toko: string | null;
+  outlet_latitude: number | null;
+  outlet_longitude: number | null;
+  flyer_title: string | null;
+  flyer_body: string | null;
+  flyer_accent: string | null;
+  flyer_discount_label: string | null;
 };
 
 export type LaundryOrderDetail = {
@@ -14,6 +22,10 @@ export type LaundryOrderDetail = {
   estimasi_pakaian?: number;
   catatan?: string;
   pickup_time?: string;
+  customer_latitude?: number;
+  customer_longitude?: number;
+  outlet_name?: string;
+  outlet_address?: string;
 };
 
 export type LaundryOrder = {
