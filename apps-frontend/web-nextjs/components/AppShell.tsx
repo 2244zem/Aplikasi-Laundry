@@ -71,8 +71,8 @@ export function AppShell({ children }: Readonly<{ children: React.ReactNode }>) 
                 <i className="fi fi-sr-washer" aria-hidden />
               </span>
               <span>
-                ScaleWash
-                <small>clean ops</small>
+                Ungu Laundry
+                <small>premium care</small>
               </span>
             </Link>
 

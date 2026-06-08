@@ -50,8 +50,8 @@ export default function HomePage() {
     <main className="page home-screen">
       <section className="home-hero no-mockup">
         <div className="home-copy">
-          <p className="eyebrow">Platform laundry B2B2C</p>
-          <h1>Laundry app for pickup, outlet, chat, and POS.</h1>
+          <p className="eyebrow">Ungu Laundry B2B2C</p>
+          <h1>Premium laundry pickup for modern outlets.</h1>
           <p className="muted">
             Customer pilih laundry terdekat, admin outlet menerima order yang memang ditujukan ke tokonya,
             status bergerak realtime, dan chat menyimpan bukti kondisi pakaian.
@@ -87,7 +87,7 @@ export default function HomePage() {
           </div>
         </div>
 
-        <aside className="workflow-panel" aria-label="Fitur nyata ScaleWash">
+        <aside className="workflow-panel" aria-label="Fitur nyata Ungu Laundry">
           <div className="workflow-header">
             <span className="ad-pill">Real features</span>
             <h2>Preview lama sudah jadi workflow asli.</h2>

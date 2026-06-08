@@ -481,7 +481,7 @@ export function CustomerOrderForm({ profile }: Props) {
             <span className="status pending">Draft</span>
           </div>
           <div className="receipt-preview modern">
-            <p>SCALEWASH ORDER</p>
+            <p>UNGU LAUNDRY ORDER</p>
             <p>User: {profile.nama}</p>
             <p>Outlet: {selectedOutlet ? outletName(selectedOutlet) : '-'}</p>
             <p>Paket: {paket}</p>

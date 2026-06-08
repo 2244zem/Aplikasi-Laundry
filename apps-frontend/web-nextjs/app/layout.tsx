@@ -5,8 +5,8 @@ import '@flaticon/flaticon-uicons/css/solid/rounded.css';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'ScaleWash',
-  description: 'Laundry SaaS B2B2C with Supabase, Midtrans, and POS printing.',
+  title: 'Ungu Laundry',
+  description: 'Premium laundry SaaS B2B2C with Supabase, Midtrans, and POS printing.',
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

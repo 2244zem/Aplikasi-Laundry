@@ -49,7 +49,7 @@ async function ensureProfile(user: User, fallbackName?: string) {
     .from('tabel_user')
     .insert({
       auth_user_id: user.id,
-      nama: fallbackName || user.email?.split('@')[0] || 'ScaleWash User',
+      nama: fallbackName || user.email?.split('@')[0] || 'Ungu Laundry User',
       email: user.email,
     })
     .select('*')
@@ -184,7 +184,7 @@ export function AuthPanel({ children }: AuthPanelProps) {
               <p className="eyebrow">Sesi aktif</p>
               <h2 style={{ marginBottom: 6 }}>{profile.nama}</h2>
               <p className="muted" style={{ marginBottom: 0 }}>
-                {profile.email} · {profile.role} · Langganan {profile.status_langganan}
+                {profile.email} - {profile.role} - Langganan {profile.status_langganan}
               </p>
             </div>
             <button className="button secondary" onClick={handleSignOut} type="button">
@@ -202,7 +202,7 @@ export function AuthPanel({ children }: AuthPanelProps) {
     <div className="grid two">
       <section className="panel">
         <p className="eyebrow">Masuk Supabase</p>
-        <h1>{mode === 'signup' ? 'Buat akun ScaleWash' : 'Masuk untuk lanjut'}</h1>
+        <h1>{mode === 'signup' ? 'Buat akun Ungu Laundry' : 'Masuk untuk lanjut'}</h1>
         <p className="muted">
           Akun ini dipakai untuk mencoba RLS, membuat order customer, dan membuka dashboard admin.
         </p>

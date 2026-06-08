@@ -34,7 +34,7 @@ function buildReceiptHtml(order: LaundryOrder) {
   return `
     <html>
       <head>
-        <title>ScaleWash Nota ${escapeHtml(order.id.slice(0, 8))}</title>
+        <title>Ungu Laundry Nota ${escapeHtml(order.id.slice(0, 8))}</title>
         <style>
           body {
             width: 58mm;
@@ -62,7 +62,7 @@ function buildReceiptHtml(order: LaundryOrder) {
         </style>
       </head>
       <body>
-        <h1>SCALEWASH NOTA</h1>
+        <h1>UNGU LAUNDRY NOTA</h1>
         <p>ID: ${escapeHtml(order.id.slice(0, 8))}</p>
         <p>User: ${escapeHtml(order.user_id)}</p>
         <p>Paket: ${escapeHtml(detail.paket ?? '-')}</p>
