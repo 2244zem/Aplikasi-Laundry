@@ -17,8 +17,11 @@ apps-frontend/
 services-backend/
   bff-service/
     src/server.js
+  finance-service/
+    src/main/java/com/scalewash/finance
 supabase/
   migrations/20260608000000_init_schema.sql
+  migrations/20260608020000_finance_and_chat_attachments.sql
 ```
 
 ## Quick Start Notes
@@ -40,6 +43,8 @@ Open:
 
 - Customer order: http://127.0.0.1:3000/orders/new
 - Admin dashboard: http://127.0.0.1:3000/admin/dashboard
+- Admin finance: http://127.0.0.1:3000/admin/finance
+- Order chat: http://127.0.0.1:3000/orders/[orderId]/chat
 
 New users start as `USER`. To test admin dashboard before Midtrans subscription is connected, update the test user in Supabase Table Editor:
 
@@ -54,6 +59,25 @@ After the extra admin intake policy migration is added, push pending migrations 
 ```bash
 npx.cmd supabase db push --yes
 ```
+
+## Finance Aggregation
+
+The Spring Boot finance service lives in `services-backend/finance-service`. It reads paid outlet orders and outlet expenses, then writes monthly summaries to `tabel_neraca_bulanan`.
+
+```bash
+cd services-backend/finance-service
+mvn spring-boot:run
+```
+
+Manual aggregation:
+
+```bash
+curl -X POST "http://localhost:8090/api/v1/finance/aggregate?period=2026-06"
+```
+
+## Chat Attachments
+
+Laundry proof images are stored in the public Supabase Storage bucket `bukti-cucian`. The migration creates storage policies so only order participants can upload/update/delete files inside an order folder.
 
 ## Integration References
 

@@ -35,3 +35,44 @@ export type LaundryOrder = {
   created_at: string;
   updated_at: string;
 };
+
+export type ChatMessage = {
+  id: string;
+  order_id: string;
+  sender_user_id: string;
+  receiver_user_id: string | null;
+  message: string | null;
+  attachment_url: string | null;
+  attachment_path: string | null;
+  attachment_mime_type: string | null;
+  created_at: string;
+};
+
+export type ExpenseCategory =
+  | 'SABUN'
+  | 'PARFUM'
+  | 'LISTRIK'
+  | 'GAJI'
+  | 'SEWA'
+  | 'MAINTENANCE'
+  | 'LAINNYA';
+
+export type Expense = {
+  id: string;
+  admin_id: string;
+  kategori: ExpenseCategory;
+  nominal: number;
+  keterangan: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type MonthlyBalance = {
+  id: string;
+  admin_id: string;
+  bulan_tahun: string;
+  total_pendapatan_kotor: number;
+  total_pengeluaran: number;
+  pendapatan_bersih: number;
+  updated_at: string;
+};

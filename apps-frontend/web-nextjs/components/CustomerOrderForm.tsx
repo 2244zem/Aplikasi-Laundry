@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { Send } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import type { UserProfile } from '@/lib/types';
@@ -129,6 +130,13 @@ export function CustomerOrderForm({ profile }: Props) {
           <div className={`alert ${createdOrderId ? 'success' : 'error'}`}>
             {message}
             {createdOrderId ? ` ID: ${createdOrderId.slice(0, 8)}` : ''}
+            {createdOrderId ? (
+              <div style={{ marginTop: 10 }}>
+                <Link className="button secondary" href={`/orders/${createdOrderId}/chat`}>
+                  Buka Chat
+                </Link>
+              </div>
+            ) : null}
           </div>
         ) : null}
       </section>

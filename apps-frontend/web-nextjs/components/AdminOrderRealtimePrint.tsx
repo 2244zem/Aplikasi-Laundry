@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Check, Printer, RefreshCw, Save } from 'lucide-react';
+import { Check, MessageCircle, Printer, RefreshCw, Save } from 'lucide-react';
+import { InteractiveChatLaundry } from '@/components/InteractiveChatLaundry';
 import { supabase } from '@/lib/supabaseClient';
 import type { LaundryOrder, UserProfile } from '@/lib/types';
 
@@ -120,9 +121,10 @@ type OrderRowProps = {
   order: LaundryOrder;
   profile: UserProfile;
   onChange: (order: LaundryOrder) => void;
+  onOpenChat: (order: LaundryOrder) => void;
 };
 
-function OrderRow({ order, profile, onChange }: OrderRowProps) {
+function OrderRow({ order, profile, onChange, onOpenChat }: OrderRowProps) {
   const [beratKg, setBeratKg] = useState(Number(order.berat_kg ?? 0));
   const [totalHarga, setTotalHarga] = useState(Number(order.total_harga ?? 0));
   const [statusOrder, setStatusOrder] = useState<LaundryOrder['status_order']>(order.status_order);
@@ -195,7 +197,7 @@ function OrderRow({ order, profile, onChange }: OrderRowProps) {
       <td>
         <strong>{detail.paket ?? '-'}</strong>
         <p className="muted" style={{ margin: '4px 0 0' }}>
-          {detail.estimasi_pakaian ?? '-'} pcs · {detail.alamat ?? '-'}
+          {detail.estimasi_pakaian ?? '-'} pcs - {detail.alamat ?? '-'}
         </p>
       </td>
       <td>
@@ -258,6 +260,10 @@ function OrderRow({ order, profile, onChange }: OrderRowProps) {
               <Printer aria-hidden size={16} />
               Print
             </button>
+            <button className="button secondary" onClick={() => onOpenChat(order)} type="button">
+              <MessageCircle aria-hidden size={16} />
+              Chat
+            </button>
           </div>
           {message ? <small className="muted">{message}</small> : null}
         </div>
@@ -270,6 +276,7 @@ export function AdminOrderRealtimePrint({ profile }: Props) {
   const [lastOrder, setLastOrder] = useState<LaundryOrder | null>(null);
   const [printerStatus, setPrinterStatus] = useState('Siap menerima order realtime.');
   const [orders, setOrders] = useState<LaundryOrder[]>([]);
+  const [selectedChatOrder, setSelectedChatOrder] = useState<LaundryOrder | null>(null);
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState('');
   const isActiveAdmin =
@@ -416,7 +423,13 @@ export function AdminOrderRealtimePrint({ profile }: Props) {
             </thead>
             <tbody>
               {orders.map((order) => (
-                <OrderRow key={order.id} order={order} profile={profile} onChange={upsertOrder} />
+                <OrderRow
+                  key={order.id}
+                  order={order}
+                  profile={profile}
+                  onChange={upsertOrder}
+                  onOpenChat={setSelectedChatOrder}
+                />
               ))}
               {!loading && orders.length === 0 ? (
                 <tr>
@@ -431,6 +444,10 @@ export function AdminOrderRealtimePrint({ profile }: Props) {
           </table>
         </div>
       </section>
+
+      {selectedChatOrder ? (
+        <InteractiveChatLaundry orderId={selectedChatOrder.id} profile={profile} />
+      ) : null}
     </div>
   );
 }

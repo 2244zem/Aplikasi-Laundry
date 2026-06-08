@@ -7,8 +7,10 @@
 | Frontend web | Next.js | Customer app and admin dashboard |
 | Realtime database | Supabase Postgres + Realtime | Orders, users, chat, live status updates |
 | Backend-for-Frontend | Node.js Express | Midtrans webhook, server-only updates, privileged writes |
+| Finance service | Java Spring Boot | Scheduled monthly outlet finance aggregation |
 | Payment gateway | Midtrans Snap/Core/Subscription | Laundry order payments and admin SaaS subscriptions |
 | POS printing | Browser print, WebUSB/WebSerial, or Bluetooth bridge | Thermal receipt printing from active admin dashboard |
+| Object storage | Supabase Storage | Proof images for laundry condition chat |
 
 ## Supabase Project
 
@@ -61,6 +63,16 @@ MIDTRANS_SERVER_KEY="[YOUR-MIDTRANS-SERVER-KEY]"
 MIDTRANS_IS_PRODUCTION="false"
 ```
 
+Finance service `.env`:
+
+```env
+SERVER_PORT="8090"
+SPRING_DATASOURCE_URL="jdbc:postgresql://db.nlowbwnnzyywftsseamc.supabase.co:5432/postgres"
+SPRING_DATASOURCE_USERNAME="postgres"
+SPRING_DATASOURCE_PASSWORD="[YOUR-PASSWORD]"
+SCALEWASH_FINANCE_ZONE="Asia/Jakarta"
+```
+
 Important security boundary:
 
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY` can be used in the browser with Row Level Security policies.
@@ -107,3 +119,29 @@ Browser-based auto-printing depends on the admin dashboard being open and the pr
 - Default OS thermal printer plus browser print window.
 - WebUSB/WebSerial after device permission is granted.
 - Local POS bridge app that accepts receipt payloads from the web dashboard and sends ESC/POS commands.
+
+## Finance Aggregation Setup
+
+The Spring Boot service in `services-backend/finance-service` connects directly to Supabase Postgres with a private JDBC connection. It should run on a backend host, not in the browser.
+
+Scheduled aggregation runs every day at 23:00 `Asia/Jakarta` and updates `tabel_neraca_bulanan` for the current month. The manual endpoint can backfill a specific period:
+
+```text
+POST /api/v1/finance/aggregate?period=2026-06
+```
+
+## Storage Setup
+
+The migration creates a public Supabase Storage bucket:
+
+```text
+bukti-cucian
+```
+
+Files are stored under an order-scoped path:
+
+```text
+{order_id}/{sender_id}-{random_uuid}.{extension}
+```
+
+The bucket is public for image rendering, while upload/update/delete policies are restricted to order participants.

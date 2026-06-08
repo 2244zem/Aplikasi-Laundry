@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { ClipboardList, LayoutDashboard, Shirt } from 'lucide-react';
+import { ClipboardList, LayoutDashboard, ReceiptText, Shirt } from 'lucide-react';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -28,6 +28,10 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
               <Link className="nav-link" href="/admin/dashboard">
                 <LayoutDashboard aria-hidden size={17} />
                 Admin
+              </Link>
+              <Link className="nav-link" href="/admin/finance">
+                <ReceiptText aria-hidden size={17} />
+                Finance
               </Link>
             </nav>
           </header>
