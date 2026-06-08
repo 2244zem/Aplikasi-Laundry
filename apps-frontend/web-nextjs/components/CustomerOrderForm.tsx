@@ -128,6 +128,8 @@ export function CustomerOrderForm({ profile }: Props) {
 
         {message ? (
           <div className={`alert ${createdOrderId ? 'success' : 'error'}`}>
+            {createdOrderId ? <i className="fi fi-sr-badge-check success-icon" aria-hidden /> : null}
+            {' '}
             {message}
             {createdOrderId ? ` ID: ${createdOrderId.slice(0, 8)}` : ''}
             {createdOrderId ? (
