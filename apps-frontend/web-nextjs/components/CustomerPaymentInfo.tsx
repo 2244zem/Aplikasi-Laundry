@@ -59,6 +59,34 @@ function readPaymentError(payload: unknown, status: number) {
   return `BFF menolak transaksi (${status}). Coba login ulang lalu bayar lagi.`;
 }
 
+function paymentActionLabel(order: LaundryOrder) {
+  if (Number(order.total_harga || 0) < 1000) {
+    return 'Menunggu Harga';
+  }
+
+  if (order.status_order === 'DIBATALKAN') {
+    return 'Order Batal';
+  }
+
+  if (order.status_pembayaran === 'PAID') {
+    return 'Sudah Lunas';
+  }
+
+  if (order.status_pembayaran === 'REFUNDED') {
+    return 'Refunded';
+  }
+
+  if (order.status_pembayaran === 'PENDING') {
+    return 'Lanjutkan Bayar';
+  }
+
+  if (order.status_pembayaran === 'FAILED') {
+    return 'Coba Bayar Lagi';
+  }
+
+  return 'Bayar Sekarang';
+}
+
 export function CustomerPaymentInfo({ profile }: Props) {
   const [orders, setOrders] = useState<LaundryOrder[]>([]);
   const [loading, setLoading] = useState(true);
@@ -429,40 +457,42 @@ export function CustomerPaymentInfo({ profile }: Props) {
             </div>
           ) : null}
 
-          {unpaidOrders.map((order) => (
-            <article className="bill-card" key={order.id}>
-              <div>
-                <strong>#{order.id.slice(0, 8)}</strong>
-                <span>{order.format_detail?.paket || 'Laundry order'} - {order.format_detail?.outlet_name || 'Outlet'}</span>
-                <span className={paymentStatusClass(order.status_pembayaran)}>
-                  {paymentStatusLabel(order.status_pembayaran)}
-                </span>
-              </div>
-              <strong>
-                {Number(order.total_harga || 0) >= 1000
-                  ? formatCurrency(Number(order.total_harga || 0))
-                  : 'Harga belum final'}
-              </strong>
-              <button className="button primary" disabled={!paymentReady || !isPayableOrder(order) || payingOrderId === order.id} onClick={() => payWithMidtrans(order)} type="button">
-                <i className="fi fi-rr-credit-card" aria-hidden />
-                {payingOrderId === order.id
-                  ? 'Membuka...'
-                  : !authChecked
-                    ? 'Cek Session'
-                    : !hasPaymentSession
-                      ? 'Login Ulang'
-                      : bffStatus !== 'ready'
-                        ? 'BFF Belum Siap'
-                        : !isPayableOrder(order)
-                          ? 'Menunggu Harga'
-                        : 'Bayar Sekarang'}
-              </button>
-              <Link className="button secondary" href={`/orders/${order.id}/chat`}>
-                <i className="fi fi-rr-comment-alt" aria-hidden />
-                Chat Order
-              </Link>
-            </article>
-          ))}
+          {unpaidOrders.map((order) => {
+            const canPayOrder = isPayableOrder(order);
+
+            return (
+              <article className="bill-card" key={order.id}>
+                <div>
+                  <strong>#{order.id.slice(0, 8)}</strong>
+                  <span>{order.format_detail?.paket || 'Laundry order'} - {order.format_detail?.outlet_name || 'Outlet'}</span>
+                  <span className={paymentStatusClass(order.status_pembayaran)}>
+                    {paymentStatusLabel(order.status_pembayaran)}
+                  </span>
+                </div>
+                <strong>
+                  {Number(order.total_harga || 0) >= 1000
+                    ? formatCurrency(Number(order.total_harga || 0))
+                    : 'Harga belum final'}
+                </strong>
+                <button className="button primary" disabled={!paymentReady || !canPayOrder || payingOrderId === order.id} onClick={() => payWithMidtrans(order)} type="button">
+                  <i className="fi fi-rr-credit-card" aria-hidden />
+                  {payingOrderId === order.id
+                    ? 'Membuka...'
+                    : !authChecked
+                      ? 'Cek Session'
+                      : !hasPaymentSession
+                        ? 'Login Ulang'
+                        : bffStatus !== 'ready'
+                          ? 'BFF Belum Siap'
+                          : paymentActionLabel(order)}
+                </button>
+                <Link className="button secondary" href={`/orders/${order.id}/chat`}>
+                  <i className="fi fi-rr-comment-alt" aria-hidden />
+                  Chat Order
+                </Link>
+              </article>
+            );
+          })}
         </div>
       </section>
 

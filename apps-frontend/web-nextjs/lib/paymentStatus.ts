@@ -39,8 +39,9 @@ export function paymentStatusLabel(status: PaymentStatus) {
 }
 
 export function isPayableOrder(order: LaundryOrder) {
-  return order.status_pembayaran !== 'PAID'
-    && order.status_pembayaran !== 'PENDING'
+  return (order.status_pembayaran === 'UNPAID'
+      || order.status_pembayaran === 'PENDING'
+      || order.status_pembayaran === 'FAILED')
     && order.status_order !== 'DIBATALKAN'
     && Number(order.total_harga || 0) >= 1000;
 }

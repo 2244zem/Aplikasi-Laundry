@@ -487,6 +487,14 @@ app.post('/api/v1/payment/create-laundry-order-transaction', async (req, res) =>
       return res.status(403).json({ ok: false, error: 'This order does not belong to the current user.' });
     }
 
+    if (order.status_order === 'DIBATALKAN') {
+      return res.status(409).json({ ok: false, error: 'Order sudah dibatalkan dan tidak bisa dibayar.' });
+    }
+
+    if (order.status_pembayaran === 'PAID') {
+      return res.status(409).json({ ok: false, error: 'Order ini sudah lunas.' });
+    }
+
     const amount = Number(order.total_harga || 0);
 
     if (!amount || amount < 1000) {
