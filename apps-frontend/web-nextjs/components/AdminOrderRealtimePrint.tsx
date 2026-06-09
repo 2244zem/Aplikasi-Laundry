@@ -6,6 +6,7 @@ import { AdminServicePricingPanel } from '@/components/AdminServicePricingPanel'
 import { InteractiveChatLaundry } from '@/components/InteractiveChatLaundry';
 import { ListSkeleton } from '@/components/Skeleton';
 import { canEditOrderCommercials, canOperateOrders, operatorOutletId } from '@/lib/access';
+import { formatCurrencyInput, parseCurrencyInput } from '@/lib/currency';
 import { paymentStatusClass, paymentStatusLabel } from '@/lib/paymentStatus';
 import { supabase } from '@/lib/supabaseClient';
 import type { LaundryOrder, UserProfile } from '@/lib/types';
@@ -244,12 +245,12 @@ function OrderCard({ order, profile, onChange, onOpenChat }: OrderRowProps) {
           <input
             className="input"
             disabled={!canEditCommercials}
-            min={0}
-            onChange={(event) => setTotalHarga(Number(event.target.value))}
-            step="500"
+            inputMode="numeric"
+            onChange={(event) => setTotalHarga(parseCurrencyInput(event.target.value))}
+            placeholder="100.000"
             title="Total harga"
-            type="number"
-            value={totalHarga}
+            type="text"
+            value={formatCurrencyInput(totalHarga)}
           />
           <strong>{Number(totalHarga || 0) >= 1000 ? formatCurrency(totalHarga) : 'Harga belum final'}</strong>
         </div>

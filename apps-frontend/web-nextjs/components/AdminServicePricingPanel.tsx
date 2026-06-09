@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { formatCurrencyInput, parseCurrencyInput } from '@/lib/currency';
 import { supabase } from '@/lib/supabaseClient';
 import type { ServicePricing, UserProfile } from '@/lib/types';
 
@@ -217,11 +218,11 @@ export function AdminServicePricingPanel({ profile }: Props) {
               <span>Harga</span>
               <input
                 className="input"
-                min={0}
-                onChange={(event) => setForm((current) => ({ ...current, harga: Number(event.target.value) }))}
-                step="500"
-                type="number"
-                value={form.harga}
+                inputMode="numeric"
+                onChange={(event) => setForm((current) => ({ ...current, harga: parseCurrencyInput(event.target.value) }))}
+                placeholder="8.000"
+                type="text"
+                value={formatCurrencyInput(form.harga)}
               />
             </label>
             <label className="field">
