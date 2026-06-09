@@ -15,6 +15,8 @@ const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const midtransServerKey = process.env.MIDTRANS_SERVER_KEY;
 const midtransIsProduction = process.env.MIDTRANS_IS_PRODUCTION === 'true';
+const publicBffBaseUrl = process.env.BFF_PUBLIC_BASE_URL || process.env.PUBLIC_BFF_BASE_URL || '';
+const configuredMidtransWebhookUrl = process.env.MIDTRANS_WEBHOOK_URL || '';
 const whatsappApiUrl = process.env.WHATSAPP_API_URL;
 const whatsappApiToken = process.env.WHATSAPP_API_TOKEN;
 
@@ -34,6 +36,85 @@ function midtransSnapUrl() {
 
 function midtransAuthHeader() {
   return `Basic ${Buffer.from(`${midtransServerKey}:`).toString('base64')}`;
+}
+
+function classifyMidtransServerKey() {
+  if (midtransServerKey.startsWith('SB-Mid-server-')) {
+    return 'sandbox';
+  }
+
+  if (midtransServerKey.startsWith('Mid-server-')) {
+    return 'production';
+  }
+
+  return 'unknown';
+}
+
+function resolveMidtransWebhookUrl() {
+  if (configuredMidtransWebhookUrl) {
+    return configuredMidtransWebhookUrl;
+  }
+
+  if (publicBffBaseUrl) {
+    return `${publicBffBaseUrl.replace(/\/$/, '')}/api/v1/payment/midtrans-webhook`;
+  }
+
+  return '';
+}
+
+function buildMidtransReadiness() {
+  const environment = midtransIsProduction ? 'production' : 'sandbox';
+  const serverKeyMode = classifyMidtransServerKey();
+  const webhookUrl = resolveMidtransWebhookUrl();
+  const keyMatchesEnvironment = serverKeyMode === environment;
+  const webhookUrlConfigured = Boolean(webhookUrl);
+  const webhookHttpsReady = webhookUrl.startsWith('https://');
+  const warnings = [];
+
+  if (!keyMatchesEnvironment) {
+    warnings.push(
+      serverKeyMode === 'unknown'
+        ? 'Prefix MIDTRANS_SERVER_KEY tidak dikenali. Sandbox biasanya SB-Mid-server-..., production biasanya Mid-server-....'
+        : `MIDTRANS_IS_PRODUCTION=${midtransIsProduction} tetapi server key terlihat seperti ${serverKeyMode}.`,
+    );
+  }
+
+  if (midtransIsProduction && !webhookHttpsReady) {
+    warnings.push('Production membutuhkan MIDTRANS_WEBHOOK_URL atau BFF_PUBLIC_BASE_URL HTTPS untuk webhook Midtrans.');
+  }
+
+  if (!midtransIsProduction) {
+    warnings.push('Mode sandbox: QRIS/GoPay diuji dengan simulator Midtrans, bukan aplikasi pembayaran asli.');
+  }
+
+  return {
+    environment,
+    key_matches_environment: keyMatchesEnvironment,
+    production_ready: midtransIsProduction && keyMatchesEnvironment && webhookHttpsReady,
+    server_key_mode: serverKeyMode,
+    webhook_https_ready: webhookHttpsReady,
+    webhook_url_configured: webhookUrlConfigured,
+    warnings,
+  };
+}
+
+function resolveRequestOrigin(req) {
+  const origin = req.headers.origin;
+
+  if (typeof origin === 'string' && origin.startsWith('http')) {
+    return origin;
+  }
+
+  const forwardedProto = req.headers['x-forwarded-proto'];
+  const forwardedHost = req.headers['x-forwarded-host'];
+  const protocol = Array.isArray(forwardedProto) ? forwardedProto[0] : forwardedProto;
+  const host = Array.isArray(forwardedHost) ? forwardedHost[0] : forwardedHost;
+
+  if (protocol && host) {
+    return `${protocol}://${host}`;
+  }
+
+  return '';
 }
 
 function authFailure(status, code, error) {
@@ -327,8 +408,11 @@ async function markLaundryOrderFailed(payload) {
 }
 
 app.get('/health', (_req, res) => {
+  const readiness = buildMidtransReadiness();
+
   res.json({
-    midtrans_environment: midtransIsProduction ? 'production' : 'sandbox',
+    midtrans: readiness,
+    midtrans_environment: readiness.environment,
     ok: true,
     service: 'scalewash-bff-service',
   });
@@ -372,18 +456,27 @@ app.post('/api/v1/payment/create-laundry-order-transaction', async (req, res) =>
       return res.status(403).json({ ok: false, error: 'This order does not belong to the current user.' });
     }
 
-    const amount = Number(order.total_harga || order.format_detail?.estimasi_harga || 0);
+    const amount = Number(order.total_harga || 0);
 
     if (!amount || amount < 1000) {
       return res.status(400).json({
         ok: false,
-        error: 'Total order belum valid. Admin perlu mengisi harga final atau estimasi harga minimal Rp 1.000.',
+        error: 'Total order belum valid. Admin wajib mengisi harga final minimal Rp 1.000 sebelum customer bisa membayar.',
       });
     }
 
     const midtransOrderId = `UL-${order.id.slice(0, 8)}-${Date.now()}`;
     const customer = order.tabel_user ?? {};
+    const requestOrigin = resolveRequestOrigin(req);
+    const finishRedirectUrl = requestOrigin
+      ? `${requestOrigin}/orders/payment/result?laundry_order_id=${encodeURIComponent(order.id)}&midtrans_order_id=${encodeURIComponent(midtransOrderId)}`
+      : undefined;
     const snapPayload = {
+      callbacks: finishRedirectUrl
+        ? {
+            finish: finishRedirectUrl,
+          }
+        : undefined,
       transaction_details: {
         order_id: midtransOrderId,
         gross_amount: Math.round(amount),

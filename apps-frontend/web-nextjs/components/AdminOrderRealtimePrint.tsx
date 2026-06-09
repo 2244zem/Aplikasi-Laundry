@@ -6,6 +6,7 @@ import { AdminServicePricingPanel } from '@/components/AdminServicePricingPanel'
 import { InteractiveChatLaundry } from '@/components/InteractiveChatLaundry';
 import { ListSkeleton } from '@/components/Skeleton';
 import { canEditOrderCommercials, canOperateOrders, operatorOutletId } from '@/lib/access';
+import { paymentStatusClass, paymentStatusLabel } from '@/lib/paymentStatus';
 import { supabase } from '@/lib/supabaseClient';
 import type { LaundryOrder, UserProfile } from '@/lib/types';
 
@@ -21,6 +22,8 @@ const statusOptions: LaundryOrder['status_order'][] = [
 type Props = {
   profile: UserProfile;
 };
+
+type AdminPaymentFilter = 'ALL' | 'UNPAID' | 'PENDING' | 'PAID' | 'FAILED';
 
 function escapeHtml(value: unknown) {
   return String(value ?? '')
@@ -124,6 +127,18 @@ function orderStatusLabel(status: LaundryOrder['status_order']) {
   return status === 'PENDING_CONFIRMATION' ? 'PENDING' : status;
 }
 
+function matchesPaymentFilter(order: LaundryOrder, filter: AdminPaymentFilter) {
+  if (filter === 'ALL') {
+    return true;
+  }
+
+  if (filter === 'UNPAID') {
+    return order.status_pembayaran !== 'PAID';
+  }
+
+  return order.status_pembayaran === filter;
+}
+
 type OrderRowProps = {
   order: LaundryOrder;
   profile: UserProfile;
@@ -185,7 +200,9 @@ function OrderCard({ order, profile, onChange, onOpenChat }: OrderRowProps) {
         </div>
         <div className="ticket-status-stack">
           <span className={statusClass(order)}>{orderStatusLabel(order.status_order)}</span>
-          <span className="status subtle">{order.status_pembayaran}</span>
+          <span className={paymentStatusClass(order.status_pembayaran)}>
+            {paymentStatusLabel(order.status_pembayaran)}
+          </span>
         </div>
       </div>
 
@@ -234,8 +251,13 @@ function OrderCard({ order, profile, onChange, onOpenChat }: OrderRowProps) {
             type="number"
             value={totalHarga}
           />
-          <strong>{formatCurrency(totalHarga)}</strong>
+          <strong>{Number(totalHarga || 0) >= 1000 ? formatCurrency(totalHarga) : 'Harga belum final'}</strong>
         </div>
+        {Number(totalHarga || 0) < 1000 ? (
+          <div className="alert info ticket-price-alert">
+            Isi harga final minimal Rp 1.000 sebelum customer bisa membayar Midtrans.
+          </div>
+        ) : null}
       </div>
 
       <div className="ticket-actions">
@@ -465,11 +487,14 @@ export function AdminOrderRealtimePrint({ profile }: Props) {
   const [lastOrder, setLastOrder] = useState<LaundryOrder | null>(null);
   const [printerStatus, setPrinterStatus] = useState('Siap menerima order realtime.');
   const [orders, setOrders] = useState<LaundryOrder[]>([]);
+  const [paymentFilter, setPaymentFilter] = useState<AdminPaymentFilter>('ALL');
   const [selectedChatOrder, setSelectedChatOrder] = useState<LaundryOrder | null>(null);
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState('');
   const isActiveAdmin = canOperateOrders(profile);
   const outletId = operatorOutletId(profile);
+  const visibleOrders = orders.filter((order) => matchesPaymentFilter(order, paymentFilter));
+  const unpaidCount = orders.filter((order) => order.status_pembayaran !== 'PAID').length;
 
   async function loadOrders() {
     setLoading(true);
@@ -631,14 +656,31 @@ export function AdminOrderRealtimePrint({ profile }: Props) {
             <p className="eyebrow">Antrian order</p>
             <h2>Pesanan masuk ke outlet kamu</h2>
           </div>
-          <span className="status active">{orders.length} order</span>
+          <div className="admin-order-tools">
+            <span className="status pending">{unpaidCount} belum lunas</span>
+            <span className="status active">{orders.length} order</span>
+          </div>
+        </div>
+
+        <div className="segmented-control payment-filter-control" role="tablist" aria-label="Filter status pembayaran">
+          {(['ALL', 'UNPAID', 'PENDING', 'PAID', 'FAILED'] as AdminPaymentFilter[]).map((filter) => (
+            <button
+              aria-selected={paymentFilter === filter}
+              className={paymentFilter === filter ? 'active' : ''}
+              key={filter}
+              onClick={() => setPaymentFilter(filter)}
+              type="button"
+            >
+              {filter === 'ALL' ? 'Semua' : filter === 'UNPAID' ? 'Belum lunas' : filter}
+            </button>
+          ))}
         </div>
 
         {errorMessage ? <div className="alert error">{errorMessage}</div> : null}
 
         <div className="order-board">
           {loading && orders.length === 0 ? <ListSkeleton count={3} /> : null}
-          {orders.map((order) => (
+          {visibleOrders.map((order) => (
             <OrderCard
               key={order.id}
               order={order}
@@ -647,11 +689,11 @@ export function AdminOrderRealtimePrint({ profile }: Props) {
               onOpenChat={setSelectedChatOrder}
             />
           ))}
-          {!loading && orders.length === 0 ? (
+          {!loading && visibleOrders.length === 0 ? (
             <div className="empty-state">
               <i className="fi fi-rr-ballot" aria-hidden />
-              <strong>Belum ada pesanan</strong>
-              <span>Order akan muncul ketika customer memilih outlet ini.</span>
+              <strong>{orders.length === 0 ? 'Belum ada pesanan' : 'Tidak ada order di filter ini'}</strong>
+              <span>{orders.length === 0 ? 'Order akan muncul ketika customer memilih outlet ini.' : 'Ganti filter untuk melihat status pembayaran lain.'}</span>
             </div>
           ) : null}
         </div>

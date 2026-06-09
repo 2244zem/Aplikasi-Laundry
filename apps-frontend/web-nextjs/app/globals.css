@@ -2550,6 +2550,109 @@ h3 {
   font-weight: 750;
 }
 
+.production-readiness-card {
+  display: grid;
+  gap: 12px;
+}
+
+.readiness-list {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.readiness-list span {
+  align-items: center;
+  background: rgba(255, 248, 225, 0.72);
+  border: 1px solid rgba(183, 121, 31, 0.18);
+  border-radius: 8px;
+  color: var(--warning);
+  display: flex;
+  font-size: 13px;
+  font-weight: 850;
+  gap: 8px;
+  min-height: 46px;
+  padding: 10px;
+}
+
+.readiness-list span.ready {
+  background: #e8f9f0;
+  border-color: #b7efcf;
+  color: var(--success);
+}
+
+.readiness-warnings {
+  display: grid;
+  gap: 6px;
+}
+
+.readiness-warnings small {
+  color: var(--muted);
+  font-weight: 750;
+  line-height: 1.45;
+}
+
+.payment-result-screen {
+  display: grid;
+  gap: 16px;
+}
+
+.payment-result-hero {
+  align-items: center;
+  display: grid;
+  gap: 16px;
+  grid-template-columns: auto 1fr auto;
+}
+
+.payment-result-icon {
+  background: var(--lavender-200);
+  border-radius: 8px;
+  color: var(--plum-900);
+  display: grid;
+  font-size: 26px;
+  height: 56px;
+  place-items: center;
+  width: 56px;
+}
+
+.payment-result-hero.done .payment-result-icon {
+  background: #e8f9f0;
+  color: var(--success);
+}
+
+.payment-result-hero.failed .payment-result-icon {
+  background: #fff0f2;
+  color: var(--danger);
+}
+
+.payment-result-detail {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-bottom: 16px;
+}
+
+.payment-result-detail div {
+  background: var(--lavender-100);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 12px;
+}
+
+.payment-result-detail span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.payment-result-detail strong {
+  overflow-wrap: anywhere;
+}
+
 .instructions-panel {
   display: grid;
   gap: 12px;
@@ -2577,6 +2680,22 @@ h3 {
   font-weight: 750;
   line-height: 1.55;
   margin: 3px 0 0;
+}
+
+.admin-order-tools {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.payment-filter-control {
+  margin-bottom: 14px;
+}
+
+.ticket-price-alert {
+  margin-top: 10px;
 }
 
 .inventory-grid {
@@ -3643,6 +3762,8 @@ h3 {
 .device-android .grid.two,
 .device-android .order-layout,
 .device-android .payment-grid,
+.device-android .readiness-list,
+.device-android .payment-result-detail,
 .device-android .inventory-grid,
 .device-android .pricing-grid,
 .device-android .admin-chat-layout {
@@ -3709,6 +3830,7 @@ h3 {
 .device-android .dashboard-hero,
 .device-android .location-strip,
 .device-android .payment-sandbox-note,
+.device-android .payment-result-hero,
 .device-android .ticket-actions,
 .device-android .ticket-edit {
   align-items: stretch;

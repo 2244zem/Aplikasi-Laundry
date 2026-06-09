@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { ListSkeleton } from '@/components/Skeleton';
 import { supabase } from '@/lib/supabaseClient';
 import { getValidatedAuthSession } from '@/lib/authSession';
+import { isPayableOrder, paymentStatusClass, paymentStatusLabel } from '@/lib/paymentStatus';
 import type { LaundryOrder, UserProfile } from '@/lib/types';
 
 type Props = {
@@ -13,6 +14,14 @@ type Props = {
 
 type BffStatus = 'checking' | 'missing' | 'offline' | 'ready';
 type PaymentEnvironment = 'production' | 'sandbox' | 'unknown';
+type MidtransReadiness = {
+  keyMatchesEnvironment: boolean;
+  productionReady: boolean;
+  serverKeyMode: PaymentEnvironment;
+  warnings: string[];
+  webhookHttpsReady: boolean;
+  webhookUrlConfigured: boolean;
+};
 
 const qrisSandboxSimulatorUrl = 'https://simulator.sandbox.midtrans.com/qris/index';
 
@@ -56,6 +65,14 @@ export function CustomerPaymentInfo({ profile }: Props) {
   const [authChecked, setAuthChecked] = useState(false);
   const [hasPaymentSession, setHasPaymentSession] = useState(false);
   const [paymentEnvironment, setPaymentEnvironment] = useState<PaymentEnvironment>('unknown');
+  const [midtransReadiness, setMidtransReadiness] = useState<MidtransReadiness>({
+    keyMatchesEnvironment: false,
+    productionReady: false,
+    serverKeyMode: 'unknown',
+    warnings: [],
+    webhookHttpsReady: false,
+    webhookUrlConfigured: false,
+  });
   const [bffStatus, setBffStatus] = useState<BffStatus>(
     process.env.NEXT_PUBLIC_BFF_BASE_URL ? 'checking' : 'missing',
   );
@@ -65,7 +82,7 @@ export function CustomerPaymentInfo({ profile }: Props) {
     [orders],
   );
   const unpaidTotal = useMemo(
-    () => unpaidOrders.reduce((sum, order) => sum + Number(order.total_harga || order.format_detail?.estimasi_harga || 0), 0),
+    () => unpaidOrders.reduce((sum, order) => sum + Number(order.total_harga || 0), 0),
     [unpaidOrders],
   );
   const paymentReady = Boolean(process.env.NEXT_PUBLIC_BFF_BASE_URL)
@@ -187,6 +204,10 @@ export function CustomerPaymentInfo({ profile }: Props) {
     if (!bffBaseUrl) {
       setBffStatus('missing');
       setPaymentEnvironment('unknown');
+      setMidtransReadiness((currentReadiness) => ({
+        ...currentReadiness,
+        warnings: ['NEXT_PUBLIC_BFF_BASE_URL belum diisi.'],
+      }));
       return;
     }
 
@@ -202,11 +223,25 @@ export function CustomerPaymentInfo({ profile }: Props) {
           signal: controller.signal,
         });
         const payload = await response.json().catch(() => ({}));
-        const nextEnvironment = payload?.midtrans_environment === 'production' ? 'production' : 'sandbox';
+        const nextEnvironment = payload?.midtrans?.environment === 'production' || payload?.midtrans_environment === 'production'
+          ? 'production'
+          : 'sandbox';
+        const nextServerKeyMode =
+          payload?.midtrans?.server_key_mode === 'production' || payload?.midtrans?.server_key_mode === 'sandbox'
+            ? payload.midtrans.server_key_mode
+            : 'unknown';
 
         if (mounted) {
           setBffStatus(response.ok ? 'ready' : 'offline');
           setPaymentEnvironment(response.ok ? nextEnvironment : 'unknown');
+          setMidtransReadiness({
+            keyMatchesEnvironment: Boolean(payload?.midtrans?.key_matches_environment),
+            productionReady: Boolean(payload?.midtrans?.production_ready),
+            serverKeyMode: nextServerKeyMode,
+            warnings: Array.isArray(payload?.midtrans?.warnings) ? payload.midtrans.warnings : [],
+            webhookHttpsReady: Boolean(payload?.midtrans?.webhook_https_ready),
+            webhookUrlConfigured: Boolean(payload?.midtrans?.webhook_url_configured),
+          });
         }
       } catch (_error) {
         if (mounted && !controller.signal.aborted) {
@@ -309,6 +344,40 @@ export function CustomerPaymentInfo({ profile }: Props) {
         </div>
       </section>
 
+      <section className="app-card production-readiness-card">
+        <div className="page-header compact">
+          <div>
+            <p className="eyebrow">Production readiness</p>
+            <h2>{paymentEnvironment === 'production' ? 'Mode production dicek.' : 'Masih mode sandbox.'}</h2>
+            <p className="muted">Checklist ini mencegah QRIS real dipakai saat key/webhook belum siap.</p>
+          </div>
+          <span className={`status ${paymentEnvironment === 'production' && midtransReadiness.productionReady ? 'done' : 'pending'}`}>
+            {paymentEnvironment === 'production' && midtransReadiness.productionReady ? 'READY' : 'CHECK'}
+          </span>
+        </div>
+        <div className="readiness-list">
+          <span className={paymentEnvironment !== 'unknown' ? 'ready' : ''}>
+            <i className="fi fi-rr-settings" aria-hidden />
+            MIDTRANS_IS_PRODUCTION: {paymentEnvironment === 'production' ? 'true' : paymentEnvironment === 'sandbox' ? 'false' : 'dicek'}
+          </span>
+          <span className={midtransReadiness.keyMatchesEnvironment ? 'ready' : ''}>
+            <i className="fi fi-rr-key" aria-hidden />
+            Server key: {midtransReadiness.serverKeyMode === 'unknown' ? 'prefix tidak dikenali' : midtransReadiness.serverKeyMode}
+          </span>
+          <span className={paymentEnvironment !== 'production' || midtransReadiness.webhookHttpsReady ? 'ready' : ''}>
+            <i className="fi fi-rr-link" aria-hidden />
+            Webhook HTTPS: {midtransReadiness.webhookUrlConfigured ? (midtransReadiness.webhookHttpsReady ? 'siap' : 'belum HTTPS') : 'belum diisi'}
+          </span>
+        </div>
+        {midtransReadiness.warnings.length > 0 ? (
+          <div className="readiness-warnings">
+            {midtransReadiness.warnings.map((warning) => (
+              <small key={warning}>{warning}</small>
+            ))}
+          </div>
+        ) : null}
+      </section>
+
       {paymentEnvironment === 'sandbox' ? (
         <section className="alert info payment-sandbox-note">
           <div>
@@ -355,9 +424,16 @@ export function CustomerPaymentInfo({ profile }: Props) {
               <div>
                 <strong>#{order.id.slice(0, 8)}</strong>
                 <span>{order.format_detail?.paket || 'Laundry order'} - {order.format_detail?.outlet_name || 'Outlet'}</span>
+                <span className={paymentStatusClass(order.status_pembayaran)}>
+                  {paymentStatusLabel(order.status_pembayaran)}
+                </span>
               </div>
-              <strong>{formatCurrency(Number(order.total_harga || order.format_detail?.estimasi_harga || 0))}</strong>
-              <button className="button primary" disabled={!paymentReady || payingOrderId === order.id} onClick={() => payWithMidtrans(order)} type="button">
+              <strong>
+                {Number(order.total_harga || 0) >= 1000
+                  ? formatCurrency(Number(order.total_harga || 0))
+                  : 'Harga belum final'}
+              </strong>
+              <button className="button primary" disabled={!paymentReady || !isPayableOrder(order) || payingOrderId === order.id} onClick={() => payWithMidtrans(order)} type="button">
                 <i className="fi fi-rr-credit-card" aria-hidden />
                 {payingOrderId === order.id
                   ? 'Membuka...'
@@ -367,6 +443,8 @@ export function CustomerPaymentInfo({ profile }: Props) {
                       ? 'Login Ulang'
                       : bffStatus !== 'ready'
                         ? 'BFF Belum Siap'
+                        : !isPayableOrder(order)
+                          ? 'Menunggu Harga'
                         : 'Bayar Sekarang'}
               </button>
               <Link className="button secondary" href={`/orders/${order.id}/chat`}>

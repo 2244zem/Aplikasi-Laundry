@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { ListSkeleton, MetricSkeleton } from '@/components/Skeleton';
+import { paymentStatusClass, paymentStatusLabel } from '@/lib/paymentStatus';
 import { supabase } from '@/lib/supabaseClient';
 import type { LaundryOrder, UserProfile } from '@/lib/types';
 
@@ -233,8 +234,8 @@ export function CustomerOrderHistory({ profile }: Props) {
                     <span className={`status ${order.status_order === 'SELESAI' ? 'done' : isCancelled ? 'failed' : 'pending'}`}>
                       {statusLabel(order.status_order)}
                     </span>
-                    <span className={`status ${order.status_pembayaran === 'PAID' ? 'done' : 'subtle'}`}>
-                      {order.status_pembayaran === 'PAID' ? 'LUNAS' : order.status_pembayaran}
+                    <span className={paymentStatusClass(order.status_pembayaran)}>
+                      {paymentStatusLabel(order.status_pembayaran)}
                     </span>
                   </div>
                 </div>

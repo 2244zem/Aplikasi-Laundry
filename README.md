@@ -31,6 +31,8 @@ supabase/
 3. Use the Next.js sample in `apps-frontend/web-nextjs` as the admin dashboard auto-print entry point.
 4. Run the BFF webhook in `services-backend/bff-service` after setting Midtrans and Supabase server-side environment variables.
 
+Payment QA checklist: [docs/payment-manual-checklist.md](docs/payment-manual-checklist.md).
+
 ## Run The Web App
 
 ```bash

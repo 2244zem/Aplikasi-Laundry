@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { ListSkeleton, MetricSkeleton } from '@/components/Skeleton';
+import { paymentStatusClass, paymentStatusLabel } from '@/lib/paymentStatus';
 import { supabase } from '@/lib/supabaseClient';
 import { useAppLanguage, useLocalizedNumber } from '@/lib/i18n';
 import type { LaundryOrder, UserProfile } from '@/lib/types';
@@ -63,7 +64,7 @@ export function UserDashboard({ profile }: Props) {
     [orders],
   );
   const unpaidTotal = useMemo(
-    () => unpaidOrders.reduce((sum, order) => sum + Number(order.total_harga || order.format_detail?.estimasi_harga || 0), 0),
+    () => unpaidOrders.reduce((sum, order) => sum + Number(order.total_harga || 0), 0),
     [unpaidOrders],
   );
 
@@ -224,6 +225,11 @@ export function UserDashboard({ profile }: Props) {
             <p className="eyebrow">{text.latest}</p>
             <h2>{primaryOrder ? `#${primaryOrder.id.slice(0, 8)}` : text.noOrder}</h2>
             <p className="muted">{primaryOrder ? format.date(primaryOrder.created_at) : text.noOrderBody}</p>
+            {primaryOrder ? (
+              <span className={paymentStatusClass(primaryOrder.status_pembayaran)}>
+                {paymentStatusLabel(primaryOrder.status_pembayaran)}
+              </span>
+            ) : null}
           </div>
           {primaryOrder ? (
             <div className="actions">
@@ -272,7 +278,11 @@ export function UserDashboard({ profile }: Props) {
               </span>
               <span>
                 <i className="fi fi-rr-wallet" aria-hidden />
-                {format.currency(Number(primaryOrder.total_harga || primaryOrder.format_detail?.estimasi_harga || 0))}
+                {Number(primaryOrder.total_harga || 0) >= 1000
+                  ? format.currency(Number(primaryOrder.total_harga || 0))
+                  : language === 'id'
+                    ? 'Harga belum final'
+                    : 'Final price pending'}
               </span>
             </div>
           </div>
