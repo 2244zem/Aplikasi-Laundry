@@ -18,6 +18,7 @@ const copy = {
   id: {
     eyebrow: 'Ungu Laundry B2B2C',
     title: 'Aplikasi laundry modern untuk pickup, outlet, chat, dan POS.',
+    androidTitle: 'Laundry pickup modern.',
     body: 'Customer memilih laundry terdekat, order masuk ke outlet yang dipilih, status bergerak realtime, dan chat menyimpan bukti kondisi pakaian.',
     order: 'Buat Order',
     admin: 'Dashboard Admin',
@@ -38,6 +39,7 @@ const copy = {
   en: {
     eyebrow: 'Ungu Laundry B2B2C',
     title: 'Modern laundry app for pickup, outlets, chat, and POS.',
+    androidTitle: 'Modern laundry pickup.',
     body: 'Customers choose nearby laundry outlets, orders go to the selected outlet, status updates in realtime, and chat stores garment proof.',
     order: 'Create Order',
     admin: 'Admin Dashboard',
@@ -157,9 +159,31 @@ export function HomeExperience() {
   return (
     <main className="page home-screen">
       <section className="home-hero no-mockup">
+        <div className="android-showcase-card" aria-hidden="true">
+          <div className="android-showcase-visual">
+            <span className="android-scene-orb" />
+            <span className="android-scene-machine">
+              <i className="fi fi-rr-washer" aria-hidden />
+            </span>
+            <span className="android-scene-shirt">
+              <i className="fi fi-rr-shirt-long-sleeve" aria-hidden />
+            </span>
+          </div>
+          <div className="android-showcase-info">
+            <div>
+              <strong>{language === 'id' ? 'Pickup siap' : 'Pickup ready'}</strong>
+              <span>{language === 'id' ? 'Outlet premium terdekat' : 'Nearby premium outlet'}</span>
+            </div>
+            <em>4.8</em>
+          </div>
+        </div>
+
         <div className="home-copy">
           <p className="eyebrow">{t.eyebrow}</p>
-          <h1>{t.title}</h1>
+          <h1>
+            <span className="home-title-full">{t.title}</span>
+            <span className="home-title-android">{t.androidTitle}</span>
+          </h1>
           <p className="muted">{t.body}</p>
           <div className="actions hero-actions">
             <Link className="button primary" href="/orders/new">
