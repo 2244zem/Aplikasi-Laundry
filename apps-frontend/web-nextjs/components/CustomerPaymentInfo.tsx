@@ -10,6 +10,8 @@ type Props = {
   profile: UserProfile;
 };
 
+type BffStatus = 'checking' | 'missing' | 'offline' | 'ready';
+
 function formatCurrency(value: number) {
   return new Intl.NumberFormat('id-ID', {
     currency: 'IDR',
@@ -18,11 +20,38 @@ function formatCurrency(value: number) {
   }).format(Number(value || 0));
 }
 
+function readPaymentError(payload: unknown, status: number) {
+  if (payload && typeof payload === 'object') {
+    const error = (payload as { error?: unknown }).error;
+
+    if (typeof error === 'string') {
+      return error;
+    }
+
+    if (error && typeof error === 'object') {
+      const message = (error as { message?: unknown }).message;
+
+      if (typeof message === 'string') {
+        return message;
+      }
+
+      return JSON.stringify(error);
+    }
+  }
+
+  return `BFF menolak transaksi (${status}). Coba login ulang lalu bayar lagi.`;
+}
+
 export function CustomerPaymentInfo({ profile }: Props) {
   const [orders, setOrders] = useState<LaundryOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [payingOrderId, setPayingOrderId] = useState('');
   const [message, setMessage] = useState('');
+  const [authChecked, setAuthChecked] = useState(false);
+  const [hasPaymentSession, setHasPaymentSession] = useState(false);
+  const [bffStatus, setBffStatus] = useState<BffStatus>(
+    process.env.NEXT_PUBLIC_BFF_BASE_URL ? 'checking' : 'missing',
+  );
 
   const unpaidOrders = useMemo(
     () => orders.filter((order) => order.status_pembayaran !== 'PAID' && order.status_order !== 'DIBATALKAN'),
@@ -32,6 +61,16 @@ export function CustomerPaymentInfo({ profile }: Props) {
     () => unpaidOrders.reduce((sum, order) => sum + Number(order.total_harga || order.format_detail?.estimasi_harga || 0), 0),
     [unpaidOrders],
   );
+  const paymentReady = Boolean(process.env.NEXT_PUBLIC_BFF_BASE_URL)
+    && bffStatus === 'ready'
+    && authChecked
+    && hasPaymentSession;
+  const bffLabel = {
+    checking: 'BFF dicek',
+    missing: 'BFF belum diisi',
+    offline: 'BFF offline',
+    ready: 'BFF aktif',
+  }[bffStatus];
 
   useEffect(() => {
     let mounted = true;
@@ -101,6 +140,75 @@ export function CustomerPaymentInfo({ profile }: Props) {
     };
   }, [profile.id]);
 
+  useEffect(() => {
+    let mounted = true;
+
+    async function checkSession() {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (!mounted) {
+        return;
+      }
+
+      setHasPaymentSession(Boolean(session?.access_token));
+      setAuthChecked(true);
+    }
+
+    void checkSession();
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setHasPaymentSession(Boolean(session?.access_token));
+      setAuthChecked(true);
+    });
+
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  useEffect(() => {
+    const bffBaseUrl = process.env.NEXT_PUBLIC_BFF_BASE_URL;
+
+    if (!bffBaseUrl) {
+      setBffStatus('missing');
+      return;
+    }
+
+    let mounted = true;
+    const controller = new AbortController();
+
+    async function checkBff() {
+      setBffStatus('checking');
+
+      try {
+        const response = await fetch(`${bffBaseUrl}/health`, {
+          cache: 'no-store',
+          signal: controller.signal,
+        });
+
+        if (mounted) {
+          setBffStatus(response.ok ? 'ready' : 'offline');
+        }
+      } catch (_error) {
+        if (mounted && !controller.signal.aborted) {
+          setBffStatus('offline');
+        }
+      }
+    }
+
+    void checkBff();
+
+    return () => {
+      mounted = false;
+      controller.abort();
+    };
+  }, []);
+
   async function payWithMidtrans(order: LaundryOrder) {
     const bffBaseUrl = process.env.NEXT_PUBLIC_BFF_BASE_URL;
 
@@ -109,15 +217,27 @@ export function CustomerPaymentInfo({ profile }: Props) {
       return;
     }
 
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-
-    if (!session?.access_token) {
-      setMessage('Sesi login tidak ditemukan. Masuk ulang sebelum membayar.');
+    if (bffStatus !== 'ready') {
+      setMessage('BFF pembayaran belum aktif. Jalankan BFF di port 8080 lalu refresh halaman.');
       return;
     }
 
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    const freshSession = session?.access_token
+      ? session
+      : (await supabase.auth.refreshSession()).data.session;
+
+    if (!freshSession?.access_token) {
+      setHasPaymentSession(false);
+      setAuthChecked(true);
+      setMessage('Sesi login belum siap atau sudah kedaluwarsa. Login ulang, lalu buka halaman Bayar dari menu aplikasi.');
+      return;
+    }
+
+    setHasPaymentSession(true);
+    setAuthChecked(true);
     setPayingOrderId(order.id);
     setMessage('');
 
@@ -125,15 +245,15 @@ export function CustomerPaymentInfo({ profile }: Props) {
       const response = await fetch(`${bffBaseUrl}/api/v1/payment/create-laundry-order-transaction`, {
         body: JSON.stringify({ orderId: order.id }),
         headers: {
-          Authorization: `Bearer ${session.access_token}`,
+          Authorization: `Bearer ${freshSession.access_token}`,
           'Content-Type': 'application/json',
         },
         method: 'POST',
       });
-      const payload = await response.json();
+      const payload = await response.json().catch(() => ({}));
 
       if (!response.ok || !payload.ok) {
-        throw new Error(typeof payload.error === 'string' ? payload.error : 'Gagal membuat transaksi Midtrans.');
+        throw new Error(readPaymentError(payload, response.status));
       }
 
       window.location.href = payload.redirect_url;
@@ -156,6 +276,16 @@ export function CustomerPaymentInfo({ profile }: Props) {
             <p className="eyebrow">Pembayaran</p>
             <h1>Bayar order lewat Midtrans.</h1>
             <p className="muted">Klik Bayar Sekarang, selesaikan pembayaran, lalu status berubah realtime dari webhook.</p>
+            <div className="actions payment-readiness">
+              <span className={`status ${bffStatus === 'ready' ? 'done' : bffStatus === 'offline' ? 'failed' : 'pending'}`}>
+                <i className="fi fi-rr-router" aria-hidden />
+                {bffLabel}
+              </span>
+              <span className={`status ${hasPaymentSession ? 'done' : authChecked ? 'failed' : 'pending'}`}>
+                <i className="fi fi-rr-user-check" aria-hidden />
+                {hasPaymentSession ? 'Session siap' : authChecked ? 'Login ulang' : 'Cek session'}
+              </span>
+            </div>
           </div>
           <span className="status pending">{unpaidOrders.length} belum lunas</span>
         </div>
@@ -193,9 +323,17 @@ export function CustomerPaymentInfo({ profile }: Props) {
                 <span>{order.format_detail?.paket || 'Laundry order'} - {order.format_detail?.outlet_name || 'Outlet'}</span>
               </div>
               <strong>{formatCurrency(Number(order.total_harga || order.format_detail?.estimasi_harga || 0))}</strong>
-              <button className="button primary" disabled={payingOrderId === order.id} onClick={() => payWithMidtrans(order)} type="button">
+              <button className="button primary" disabled={!paymentReady || payingOrderId === order.id} onClick={() => payWithMidtrans(order)} type="button">
                 <i className="fi fi-rr-credit-card" aria-hidden />
-                {payingOrderId === order.id ? 'Membuka...' : 'Bayar Sekarang'}
+                {payingOrderId === order.id
+                  ? 'Membuka...'
+                  : !authChecked
+                    ? 'Cek Session'
+                    : !hasPaymentSession
+                      ? 'Login Ulang'
+                      : bffStatus !== 'ready'
+                        ? 'BFF Belum Siap'
+                        : 'Bayar Sekarang'}
               </button>
               <Link className="button secondary" href={`/orders/${order.id}/chat`}>
                 <i className="fi fi-rr-comment-alt" aria-hidden />

@@ -36,12 +36,31 @@ function midtransAuthHeader() {
   return `Basic ${Buffer.from(`${midtransServerKey}:`).toString('base64')}`;
 }
 
+function authFailure(status, code, error) {
+  return { code, error, profile: null, status };
+}
+
 async function getRequestProfile(req) {
-  const header = req.headers.authorization || '';
-  const token = header.startsWith('Bearer ') ? header.slice('Bearer '.length).trim() : '';
+  const rawHeader = req.headers.authorization;
+  const header = Array.isArray(rawHeader) ? rawHeader[0] : rawHeader;
+
+  if (!header) {
+    return authFailure(
+      401,
+      'MISSING_AUTH_HEADER',
+      'Authorization header belum ada. Login ulang lalu klik Bayar dari aplikasi.',
+    );
+  }
+
+  const tokenMatch = header.match(/^Bearer\s+(.+)$/i);
+  const token = tokenMatch?.[1]?.trim();
 
   if (!token) {
-    return null;
+    return authFailure(
+      401,
+      'INVALID_AUTH_HEADER',
+      'Format Authorization harus Bearer token. Login ulang lalu coba bayar lagi.',
+    );
   }
 
   const {
@@ -50,7 +69,16 @@ async function getRequestProfile(req) {
   } = await supabase.auth.getUser(token);
 
   if (userError || !user) {
-    return null;
+    console.warn('Payment auth rejected:', {
+      code: 'INVALID_SESSION',
+      reason: userError?.message ?? 'No auth user returned',
+    });
+
+    return authFailure(
+      401,
+      'INVALID_SESSION',
+      'Session login tidak valid atau sudah kedaluwarsa. Login ulang lalu coba bayar lagi.',
+    );
   }
 
   const { data: profile, error: profileError } = await supabase
@@ -59,11 +87,90 @@ async function getRequestProfile(req) {
     .eq('auth_user_id', user.id)
     .maybeSingle();
 
-  if (profileError || !profile) {
-    return null;
+  if (profileError) {
+    console.error('Payment profile lookup failed:', {
+      authUserId: user.id,
+      code: 'PROFILE_LOOKUP_FAILED',
+      reason: profileError.message,
+    });
+
+    return authFailure(500, 'PROFILE_LOOKUP_FAILED', 'Gagal membaca profil user dari database.');
   }
 
-  return profile;
+  if (profile) {
+    return { profile, user };
+  }
+
+  if (user.email) {
+    const { data: emailProfile, error: emailProfileError } = await supabase
+      .from('tabel_user')
+      .select('id,role,auth_user_id,email')
+      .eq('email', user.email)
+      .maybeSingle();
+
+    if (emailProfileError) {
+      console.error('Payment email profile lookup failed:', {
+        authUserId: user.id,
+        code: 'PROFILE_EMAIL_LOOKUP_FAILED',
+        reason: emailProfileError.message,
+      });
+
+      return authFailure(500, 'PROFILE_EMAIL_LOOKUP_FAILED', 'Gagal membaca profil user dari database.');
+    }
+
+    if (emailProfile?.auth_user_id && emailProfile.auth_user_id !== user.id) {
+      console.warn('Payment profile auth mismatch:', {
+        authUserId: user.id,
+        code: 'PROFILE_AUTH_MISMATCH',
+        profileId: emailProfile.id,
+      });
+
+      return authFailure(
+        409,
+        'PROFILE_AUTH_MISMATCH',
+        'Profil email ini terhubung ke akun login lain. Login dengan akun yang benar.',
+      );
+    }
+
+    if (emailProfile) {
+      if (!emailProfile.auth_user_id) {
+        const { error: syncError } = await supabase
+          .from('tabel_user')
+          .update({ auth_user_id: user.id })
+          .eq('id', emailProfile.id);
+
+        if (syncError) {
+          console.error('Payment profile sync failed:', {
+            authUserId: user.id,
+            code: 'PROFILE_SYNC_FAILED',
+            profileId: emailProfile.id,
+            reason: syncError.message,
+          });
+
+          return authFailure(500, 'PROFILE_SYNC_FAILED', 'Gagal menyinkronkan profil user.');
+        }
+      }
+
+      return {
+        profile: {
+          ...emailProfile,
+          auth_user_id: user.id,
+        },
+        user,
+      };
+    }
+  }
+
+  console.warn('Payment profile missing:', {
+    authUserId: user.id,
+    code: 'PROFILE_NOT_FOUND',
+  });
+
+  return authFailure(
+    401,
+    'PROFILE_NOT_FOUND',
+    'Profil user belum sinkron. Logout lalu login ulang agar profil dibuat ulang.',
+  );
 }
 
 async function sendWhatsappMessage({ message, phoneNumber }) {
@@ -231,11 +338,17 @@ app.post('/api/v1/payment/create-laundry-order-transaction', async (req, res) =>
   }
 
   try {
-    const profile = await getRequestProfile(req);
+    const authResult = await getRequestProfile(req);
 
-    if (!profile) {
-      return res.status(401).json({ ok: false, error: 'Login session is required.' });
+    if (authResult.error) {
+      return res.status(authResult.status).json({
+        ok: false,
+        auth_code: authResult.code,
+        error: authResult.error,
+      });
     }
+
+    const { profile } = authResult;
 
     const { data: order, error: orderError } = await supabase
       .from('tabel_order')

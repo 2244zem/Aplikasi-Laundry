@@ -2517,6 +2517,16 @@ h3 {
   font-weight: 750;
 }
 
+.payment-readiness {
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.payment-readiness .status {
+  align-items: center;
+  gap: 6px;
+}
+
 .instructions-panel {
   display: grid;
   gap: 12px;
