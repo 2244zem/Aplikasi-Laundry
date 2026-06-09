@@ -2,6 +2,7 @@
 
 import type { FormEvent } from 'react';
 import { useEffect, useMemo, useState } from 'react';
+import { ListSkeleton, MetricSkeleton } from '@/components/Skeleton';
 import { supabase } from '@/lib/supabaseClient';
 import type { InventoryItem, UserProfile } from '@/lib/types';
 
@@ -54,6 +55,10 @@ export function AdminInventoryPanel({ profile }: Props) {
 
     return { low, units };
   }, [items]);
+  const lowStockNames = useMemo(
+    () => items.filter(isLowStock).map((item) => item.nama_barang).slice(0, 3),
+    [items],
+  );
 
   async function loadInventory() {
     setLoading(true);
@@ -226,22 +231,45 @@ export function AdminInventoryPanel({ profile }: Props) {
       </section>
 
       <section className="grid three metric-grid">
-        <article className="panel metric-card">
-          <span>Total barang</span>
-          <strong>{items.length}</strong>
-          <small>item stok</small>
-        </article>
-        <article className="panel metric-card">
-          <span>Stok rendah</span>
-          <strong>{summary.low}</strong>
-          <small>perlu restock</small>
-        </article>
-        <article className="panel metric-card">
-          <span>Total unit</span>
-          <strong>{summary.units}</strong>
-          <small>akumulasi stok</small>
-        </article>
+        {loading && items.length === 0 ? (
+          <>
+            <MetricSkeleton />
+            <MetricSkeleton />
+            <MetricSkeleton />
+          </>
+        ) : (
+          <>
+            <article className="panel metric-card">
+              <span>Total barang</span>
+              <strong>{items.length}</strong>
+              <small>item stok</small>
+            </article>
+            <article className="panel metric-card">
+              <span>Stok rendah</span>
+              <strong>{summary.low}</strong>
+              <small>perlu restock</small>
+            </article>
+            <article className="panel metric-card">
+              <span>Total unit</span>
+              <strong>{summary.units}</strong>
+              <small>akumulasi stok</small>
+            </article>
+          </>
+        )}
       </section>
+
+      {!loading && summary.low > 0 ? (
+        <section className="low-stock-banner">
+          <i className="fi fi-rr-triangle-warning" aria-hidden />
+          <div>
+            <strong>{summary.low} stok operasional menipis</strong>
+            <span>{lowStockNames.join(', ')} perlu dicek sebelum order berikutnya diproses.</span>
+          </div>
+          <button className="button secondary" onClick={loadInventory} type="button">
+            Refresh
+          </button>
+        </section>
+      ) : null}
 
       <section className="grid two inventory-grid">
         <form className="panel form-grid" onSubmit={saveItem}>
@@ -345,7 +373,7 @@ export function AdminInventoryPanel({ profile }: Props) {
           </div>
 
           {message ? <div className={`alert ${message.includes('Gagal') ? 'error' : 'success'}`}>{message}</div> : null}
-          {loading ? <p className="muted">Memuat stok...</p> : null}
+          {loading && items.length === 0 ? <ListSkeleton count={3} /> : null}
 
           <div className="inventory-list">
             {!loading && items.length === 0 ? (

@@ -3,6 +3,7 @@
 import type { CSSProperties } from 'react';
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
+import { ListSkeleton } from '@/components/Skeleton';
 import { supabase } from '@/lib/supabaseClient';
 import type { LaundryOrder, UserProfile } from '@/lib/types';
 
@@ -203,7 +204,7 @@ export function CustomerPaymentInfo({ profile }: Props) {
         </div>
 
         {message ? <div className="alert error">{message}</div> : null}
-        {loading ? <p className="muted">Memuat tagihan...</p> : null}
+        {loading && orders.length === 0 ? <ListSkeleton count={2} /> : null}
 
         <div className="bill-list">
           {!loading && unpaidOrders.length === 0 ? (

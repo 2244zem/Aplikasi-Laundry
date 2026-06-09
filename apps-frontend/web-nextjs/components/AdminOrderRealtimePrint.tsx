@@ -4,6 +4,7 @@ import type { CSSProperties } from 'react';
 import { useEffect, useState } from 'react';
 import { AdminServicePricingPanel } from '@/components/AdminServicePricingPanel';
 import { InteractiveChatLaundry } from '@/components/InteractiveChatLaundry';
+import { ListSkeleton } from '@/components/Skeleton';
 import { supabase } from '@/lib/supabaseClient';
 import type { LaundryOrder, UserProfile } from '@/lib/types';
 
@@ -522,8 +523,20 @@ export function AdminOrderRealtimePrint({ profile }: Props) {
     setOrders((data ?? []) as LaundryOrder[]);
   }
 
-  function upsertOrder(nextOrder: LaundryOrder) {
+  function canSeeOrder(nextOrder: LaundryOrder) {
+    return (
+      profile.role === 'SUPERADMIN' ||
+      nextOrder.admin_outlet_id == null ||
+      nextOrder.admin_outlet_id === profile.id
+    );
+  }
+
+  function syncOrder(nextOrder: LaundryOrder) {
     setOrders((currentOrders) => {
+      if (!canSeeOrder(nextOrder)) {
+        return currentOrders.filter((order) => order.id !== nextOrder.id);
+      }
+
       const exists = currentOrders.some((order) => order.id === nextOrder.id);
       const nextOrders = exists
         ? currentOrders.map((order) => (order.id === nextOrder.id ? nextOrder : order))
@@ -558,8 +571,12 @@ export function AdminOrderRealtimePrint({ profile }: Props) {
         },
         (payload) => {
           const order = payload.new as LaundryOrder;
+          if (!canSeeOrder(order)) {
+            return;
+          }
+
           setLastOrder(order);
-          upsertOrder(order);
+          syncOrder(order);
 
           if (printOrder(order)) {
             setPrinterStatus(`Nota ${order.id.slice(0, 8)} dikirim ke printer.`);
@@ -576,7 +593,7 @@ export function AdminOrderRealtimePrint({ profile }: Props) {
           table: 'tabel_order',
         },
         (payload) => {
-          upsertOrder(payload.new as LaundryOrder);
+          syncOrder(payload.new as LaundryOrder);
         },
       )
       .subscribe();
@@ -584,7 +601,7 @@ export function AdminOrderRealtimePrint({ profile }: Props) {
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [isActiveAdmin]);
+  }, [isActiveAdmin, profile.id, profile.role]);
 
   if (!isActiveAdmin) {
     return (
@@ -637,12 +654,13 @@ export function AdminOrderRealtimePrint({ profile }: Props) {
         {errorMessage ? <div className="alert error">{errorMessage}</div> : null}
 
         <div className="order-board">
+          {loading && orders.length === 0 ? <ListSkeleton count={3} /> : null}
           {orders.map((order) => (
             <OrderCard
               key={order.id}
               order={order}
               profile={profile}
-              onChange={upsertOrder}
+              onChange={syncOrder}
               onOpenChat={setSelectedChatOrder}
             />
           ))}

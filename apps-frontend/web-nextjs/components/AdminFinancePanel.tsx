@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { ListSkeleton, MetricSkeleton, SkeletonBlock } from '@/components/Skeleton';
 import { supabase } from '@/lib/supabaseClient';
 import type { Expense, ExpenseCategory, MonthlyBalance, UserProfile } from '@/lib/types';
 
@@ -28,6 +29,92 @@ function formatCurrency(value: number) {
   }).format(value || 0);
 }
 
+type ChartPoint = {
+  label: string;
+  value: number;
+};
+
+function daysInPeriod(period: string) {
+  const [year, month] = period.split('-').map(Number);
+  return new Date(year, month, 0).getDate();
+}
+
+function smoothPath(points: { x: number; y: number }[]) {
+  if (points.length === 0) {
+    return '';
+  }
+
+  if (points.length === 1) {
+    return `M ${points[0].x} ${points[0].y}`;
+  }
+
+  return points.reduce((path, point, index) => {
+    if (index === 0) {
+      return `M ${point.x} ${point.y}`;
+    }
+
+    const previous = points[index - 1];
+    const controlDistance = (point.x - previous.x) / 2;
+
+    return `${path} C ${previous.x + controlDistance} ${previous.y}, ${point.x - controlDistance} ${point.y}, ${point.x} ${point.y}`;
+  }, '');
+}
+
+function FinanceAreaChart({ data, total }: { data: ChartPoint[]; total: number }) {
+  const width = 640;
+  const height = 180;
+  const padding = 14;
+  const chartBottom = height - padding;
+  const values = data.map((item) => item.value);
+  const min = Math.min(0, ...values);
+  const max = Math.max(1, ...values);
+  const range = Math.max(1, max - min);
+  const points = data.map((item, index) => ({
+    x: padding + (index / Math.max(1, data.length - 1)) * (width - padding * 2),
+    y: padding + ((max - item.value) / range) * (height - padding * 2),
+  }));
+  const linePath = smoothPath(points);
+  const areaPath = points.length
+    ? `${linePath} L ${points[points.length - 1].x} ${chartBottom} L ${points[0].x} ${chartBottom} Z`
+    : '';
+  const lastPoint = points[points.length - 1];
+
+  return (
+    <section className="panel finance-chart-panel">
+      <div className="finance-chart-head">
+        <div>
+          <p className="eyebrow">Grafik neraca</p>
+          <h2>Arus bersih bulan ini</h2>
+        </div>
+        <strong>{formatCurrency(total)}</strong>
+      </div>
+      <div className="finance-chart" aria-label="Grafik area neraca bulanan">
+        <svg viewBox={`0 0 ${width} ${height}`} role="img">
+          <defs>
+            <linearGradient id="financeAreaGradient" x1="0" x2="0" y1="0" y2="1">
+              <stop offset="0%" stopColor="rgba(77, 47, 177, 0.24)" />
+              <stop offset="100%" stopColor="rgba(255, 255, 255, 0)" />
+            </linearGradient>
+          </defs>
+          {[0.2, 0.5, 0.8].map((ratio) => (
+            <line
+              className="finance-chart-grid"
+              key={ratio}
+              x1={padding}
+              x2={width - padding}
+              y1={padding + ratio * (height - padding * 2)}
+              y2={padding + ratio * (height - padding * 2)}
+            />
+          ))}
+          {areaPath ? <path className="finance-chart-area" d={areaPath} /> : null}
+          {linePath ? <path className="finance-chart-line" d={linePath} /> : null}
+          {lastPoint ? <circle className="finance-chart-dot" cx={lastPoint.x} cy={lastPoint.y} r="4" /> : null}
+        </svg>
+      </div>
+    </section>
+  );
+}
+
 export function AdminFinancePanel({ profile }: Props) {
   const [period, setPeriod] = useState(currentPeriod());
   const [category, setCategory] = useState<ExpenseCategory>('SABUN');
@@ -44,6 +131,29 @@ export function AdminFinancePanel({ profile }: Props) {
     () => expenses.reduce((total, expense) => total + Number(expense.nominal), 0),
     [expenses],
   );
+  const grossTotal = Number(balance?.total_pendapatan_kotor ?? 0);
+  const cleanTotal = Number(balance?.pendapatan_bersih ?? grossTotal - expenseTotal);
+  const chartData = useMemo(() => {
+    const days = daysInPeriod(period);
+    const dailyExpenses = new Map<number, number>();
+
+    expenses.forEach((expense) => {
+      const day = new Date(expense.created_at).getDate();
+      dailyExpenses.set(day, (dailyExpenses.get(day) ?? 0) + Number(expense.nominal || 0));
+    });
+
+    let runningExpense = 0;
+
+    return Array.from({ length: days }).map((_, index) => {
+      const day = index + 1;
+      runningExpense += dailyExpenses.get(day) ?? 0;
+
+      return {
+        label: `${day}`,
+        value: (grossTotal * day) / days - runningExpense,
+      };
+    });
+  }, [expenses, grossTotal, period]);
 
   async function loadFinance() {
     setLoading(true);
@@ -151,19 +261,44 @@ export function AdminFinancePanel({ profile }: Props) {
       </section>
 
       <section className="grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
-        <article className="panel">
-          <p className="eyebrow">Pendapatan kotor</p>
-          <h2>{formatCurrency(Number(balance?.total_pendapatan_kotor ?? 0))}</h2>
-        </article>
-        <article className="panel">
-          <p className="eyebrow">Pengeluaran</p>
-          <h2>{formatCurrency(Number(balance?.total_pengeluaran ?? expenseTotal))}</h2>
-        </article>
-        <article className="panel">
-          <p className="eyebrow">Pendapatan bersih</p>
-          <h2>{formatCurrency(Number(balance?.pendapatan_bersih ?? -expenseTotal))}</h2>
-        </article>
+        {loading && !balance && expenses.length === 0 ? (
+          <>
+            <MetricSkeleton />
+            <MetricSkeleton />
+            <MetricSkeleton />
+          </>
+        ) : (
+          <>
+            <article className="panel">
+              <p className="eyebrow">Pendapatan kotor</p>
+              <h2>{formatCurrency(grossTotal)}</h2>
+            </article>
+            <article className="panel">
+              <p className="eyebrow">Pengeluaran</p>
+              <h2>{formatCurrency(Number(balance?.total_pengeluaran ?? expenseTotal))}</h2>
+            </article>
+            <article className="panel">
+              <p className="eyebrow">Pendapatan bersih</p>
+              <h2>{formatCurrency(cleanTotal)}</h2>
+            </article>
+          </>
+        )}
       </section>
+
+      {loading && !balance && expenses.length === 0 ? (
+        <section className="panel finance-chart-panel" aria-hidden>
+          <div className="finance-chart-head">
+            <div>
+              <SkeletonBlock className="skeleton-label" />
+              <SkeletonBlock className="skeleton-line short" />
+            </div>
+            <SkeletonBlock className="skeleton-value" />
+          </div>
+          <SkeletonBlock className="finance-chart" />
+        </section>
+      ) : (
+        <FinanceAreaChart data={chartData} total={cleanTotal} />
+      )}
 
       <section className="grid two">
         <form className="panel form-grid" onSubmit={handleCreateExpense}>
@@ -233,6 +368,13 @@ export function AdminFinancePanel({ profile }: Props) {
                 </tr>
               </thead>
               <tbody>
+                {loading && expenses.length === 0 ? (
+                  <tr>
+                    <td colSpan={3}>
+                      <ListSkeleton count={3} />
+                    </td>
+                  </tr>
+                ) : null}
                 {expenses.map((expense) => (
                   <tr key={expense.id}>
                     <td>{new Date(expense.created_at).toLocaleDateString('id-ID')}</td>

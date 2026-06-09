@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { InteractiveChatLaundry } from '@/components/InteractiveChatLaundry';
+import { ListSkeleton } from '@/components/Skeleton';
 import { supabase } from '@/lib/supabaseClient';
 import type { ChatMessage, LaundryOrder, UserProfile } from '@/lib/types';
 
@@ -219,7 +220,7 @@ export function AdminChatInbox({ profile }: Props) {
           </div>
 
           {message ? <div className="alert error">{message}</div> : null}
-          {loading ? <p className="muted">Memuat inbox...</p> : null}
+          {loading ? <ListSkeleton count={3} /> : null}
 
           <div className="chat-conversation-list">
             {!loading && conversations.length === 0 ? (

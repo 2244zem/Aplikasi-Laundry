@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
+import { ListSkeleton, MetricSkeleton } from '@/components/Skeleton';
 import { supabase } from '@/lib/supabaseClient';
 import { useAppLanguage, useLocalizedNumber } from '@/lib/i18n';
 import type { LaundryOrder, UserProfile } from '@/lib/types';
@@ -184,26 +185,37 @@ export function UserDashboard({ profile }: Props) {
       </section>
 
       <section className="grid four dashboard-metrics">
-        <article className="panel metric-card">
-          <span>{text.active}</span>
-          <strong>{activeOrders.length}</strong>
-          <small>{orders.length} total</small>
-        </article>
-        <article className="panel metric-card">
-          <span>{text.pickup}</span>
-          <strong>{primaryOrder ? statusLabel(primaryOrder.status_order, language) : '-'}</strong>
-          <small>{primaryOrder?.format_detail?.pickup_time || 'Pickup fleksibel'}</small>
-        </article>
-        <article className="panel metric-card">
-          <span>{text.outlet}</span>
-          <strong>{primaryOrder?.format_detail?.outlet_name || '-'}</strong>
-          <small>{primaryOrder?.format_detail?.paket || 'Belum ada layanan'}</small>
-        </article>
-        <article className="panel metric-card">
-          <span>{text.unpaid}</span>
-          <strong>{format.currency(unpaidTotal)}</strong>
-          <small>{unpaidOrders.length} order</small>
-        </article>
+        {loading && orders.length === 0 ? (
+          <>
+            <MetricSkeleton />
+            <MetricSkeleton />
+            <MetricSkeleton />
+            <MetricSkeleton />
+          </>
+        ) : (
+          <>
+            <article className="panel metric-card">
+              <span>{text.active}</span>
+              <strong>{activeOrders.length}</strong>
+              <small>{orders.length} total</small>
+            </article>
+            <article className="panel metric-card">
+              <span>{text.pickup}</span>
+              <strong>{primaryOrder ? statusLabel(primaryOrder.status_order, language) : '-'}</strong>
+              <small>{primaryOrder?.format_detail?.pickup_time || 'Pickup fleksibel'}</small>
+            </article>
+            <article className="panel metric-card">
+              <span>{text.outlet}</span>
+              <strong>{primaryOrder?.format_detail?.outlet_name || '-'}</strong>
+              <small>{primaryOrder?.format_detail?.paket || 'Belum ada layanan'}</small>
+            </article>
+            <article className="panel metric-card">
+              <span>{text.unpaid}</span>
+              <strong>{format.currency(unpaidTotal)}</strong>
+              <small>{unpaidOrders.length} order</small>
+            </article>
+          </>
+        )}
       </section>
 
       <section className="app-card dashboard-main-card">
@@ -230,9 +242,9 @@ export function UserDashboard({ profile }: Props) {
         </div>
 
         {message ? <div className="alert error">{message}</div> : null}
-        {loading ? <p className="muted">{text.loading}</p> : null}
+        {loading && orders.length === 0 ? <ListSkeleton count={2} /> : null}
 
-        {primaryOrder ? (
+        {!loading && primaryOrder ? (
           <div className="dashboard-order-focus">
             <div className="status-rail large" aria-label="Progress order">
               {statusSteps.map((status, index) => {
@@ -264,13 +276,15 @@ export function UserDashboard({ profile }: Props) {
               </span>
             </div>
           </div>
-        ) : (
+        ) : null}
+
+        {!loading && !primaryOrder ? (
           <div className="empty-state">
             <i className="fi fi-rr-washer" aria-hidden />
             <strong>{text.noOrder}</strong>
             <span>{text.noOrderBody}</span>
           </div>
-        )}
+        ) : null}
       </section>
     </main>
   );

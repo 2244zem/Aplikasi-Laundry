@@ -3,6 +3,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { LogIn, LogOut, UserPlus } from 'lucide-react';
+import Link from 'next/link';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { ListSkeleton, SkeletonBlock } from '@/components/Skeleton';
 import { supabase } from '@/lib/supabaseClient';
 import { ensureProfile } from '@/lib/profile';
 import type { UserProfile } from '@/lib/types';
@@ -26,6 +29,9 @@ type AuthPanelProps = {
 };
 
 export function AuthPanel({ children }: AuthPanelProps) {
+  const pathname = usePathname();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -34,6 +40,38 @@ export function AuthPanel({ children }: AuthPanelProps) {
   const [nama, setNama] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+
+  function withCurrentContext(path: string) {
+    const params = new URLSearchParams();
+
+    ['isandroid', 'istablet', 'isdesktop', 'lang'].forEach((key) => {
+      const value = searchParams.get(key);
+      if (searchParams.has(key)) {
+        params.set(key, value ?? '');
+      }
+    });
+
+    const query = params.toString();
+    return `${path}${query ? `?${query}` : ''}`;
+  }
+
+  function isAdminProfile(nextProfile: UserProfile) {
+    return nextProfile.role === 'ADMIN' || nextProfile.role === 'SUPERADMIN';
+  }
+
+  function routeAfterAuth(nextProfile: UserProfile) {
+    const isAdmin = isAdminProfile(nextProfile);
+
+    if (pathname.startsWith('/admin') && !isAdmin) {
+      return '/';
+    }
+
+    if (pathname.startsWith('/orders') && isAdmin) {
+      return '/admin/dashboard';
+    }
+
+    return '';
+  }
 
   const refreshProfile = useCallback(async () => {
     const {
@@ -120,6 +158,10 @@ export function AuthPanel({ children }: AuthPanelProps) {
         setSession(authResponse.data.session);
         setProfile(nextProfile);
         setMessage(mode === 'signup' ? 'Akun dibuat dan profile siap.' : 'Berhasil masuk.');
+        const nextRoute = routeAfterAuth(nextProfile);
+        if (nextRoute) {
+          router.replace(withCurrentContext(nextRoute));
+        }
       } else {
         setMessage('Cek email untuk konfirmasi akun Supabase Auth.');
       }
@@ -136,9 +178,46 @@ export function AuthPanel({ children }: AuthPanelProps) {
     setSession(null);
     setProfile(null);
     setLoading(false);
+    router.replace(withCurrentContext('/'));
+  }
+
+  if (loading && !session && !profile) {
+    return (
+      <section className="panel auth-skeleton">
+        <SkeletonBlock className="skeleton-label" />
+        <SkeletonBlock className="skeleton-value" />
+        <ListSkeleton count={2} />
+      </section>
+    );
   }
 
   if (session && profile) {
+    const isAdmin = isAdminProfile(profile);
+    const adminRouteMismatch = pathname.startsWith('/admin') && !isAdmin;
+    const customerRouteMismatch = pathname.startsWith('/orders') && isAdmin;
+
+    if (adminRouteMismatch || customerRouteMismatch) {
+      return (
+        <section className="panel soft">
+          <p className="eyebrow">Akses role</p>
+          <h1>{adminRouteMismatch ? 'Halaman admin khusus outlet.' : 'Halaman customer khusus user.'}</h1>
+          <p className="muted">
+            Kamu login sebagai {profile.role}. Menu dan halaman diarahkan sesuai role supaya alur kerja tetap bersih.
+          </p>
+          <div className="actions">
+            <Link className="button primary" href={withCurrentContext(isAdmin ? '/admin/dashboard' : '/')}>
+              <i className="fi fi-rr-home" aria-hidden />
+              {isAdmin ? 'Ke Dasbor' : 'Ke Dashboard User'}
+            </Link>
+            <button className="button secondary" onClick={handleSignOut} type="button">
+              <LogOut aria-hidden size={18} />
+              Keluar
+            </button>
+          </div>
+        </section>
+      );
+    }
+
     return (
       <div className="grid">
         <section className="panel soft">

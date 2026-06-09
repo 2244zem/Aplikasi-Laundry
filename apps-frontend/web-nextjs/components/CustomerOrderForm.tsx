@@ -3,6 +3,7 @@
 import type { CSSProperties } from 'react';
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
+import { ListSkeleton } from '@/components/Skeleton';
 import { supabase } from '@/lib/supabaseClient';
 import type { LaundryOrder, ServicePricing, UserProfile } from '@/lib/types';
 
@@ -499,7 +500,7 @@ export function CustomerOrderForm({ profile }: Props) {
           <div className="field">
             <span>Laundry terdekat</span>
             <div className="outlet-list">
-              {loadingOutlets ? <p className="muted">Memuat outlet aktif...</p> : null}
+              {loadingOutlets ? <ListSkeleton count={2} /> : null}
               {!loadingOutlets && sortedOutlets.length === 0 ? (
                 <div className="empty-state">
                   <i className="fi fi-rr-store-alt" aria-hidden />
@@ -652,7 +653,7 @@ export function CustomerOrderForm({ profile }: Props) {
           </div>
 
           <div className="customer-order-list">
-            {ordersLoading ? <p className="muted">Memuat status order...</p> : null}
+            {ordersLoading ? <ListSkeleton count={2} /> : null}
             {!ordersLoading && activeOrders.length === 0 ? (
               <div className="empty-state compact">
                 <i className="fi fi-rr-ballot" aria-hidden />

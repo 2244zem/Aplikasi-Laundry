@@ -77,6 +77,7 @@ export function AppShell({ children }: Readonly<{ children: React.ReactNode }>) 
   const router = useRouter();
   const [mode, setMode] = useState<DeviceMode>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [profileLoading, setProfileLoading] = useState(true);
   const [language, setLanguage] = useState<AppLanguage>('id');
 
   useEffect(() => {
@@ -102,6 +103,7 @@ export function AppShell({ children }: Readonly<{ children: React.ReactNode }>) 
       if (!session?.user) {
         if (mounted) {
           setProfile(null);
+          setProfileLoading(false);
         }
         return;
       }
@@ -110,10 +112,12 @@ export function AppShell({ children }: Readonly<{ children: React.ReactNode }>) 
         const nextProfile = await ensureProfile(session.user);
         if (mounted) {
           setProfile(nextProfile);
+          setProfileLoading(false);
         }
       } catch {
         if (mounted) {
           setProfile(null);
+          setProfileLoading(false);
         }
       }
     }
@@ -123,6 +127,9 @@ export function AppShell({ children }: Readonly<{ children: React.ReactNode }>) 
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(() => {
+      if (mounted) {
+        setProfileLoading(true);
+      }
       void loadProfile();
     });
 
@@ -133,7 +140,7 @@ export function AppShell({ children }: Readonly<{ children: React.ReactNode }>) 
   }, []);
 
   const isAdmin = profile?.role === 'ADMIN' || profile?.role === 'SUPERADMIN';
-  const navItems = isAdmin ? adminNavItems : userNavItems;
+  const navItems = profileLoading ? [] : isAdmin ? adminNavItems : userNavItems;
   const shellClass = `device-stage ${mode ? `device-${mode}` : 'device-fluid'}`;
   const currentHash = typeof window === 'undefined' ? '' : window.location.hash;
 

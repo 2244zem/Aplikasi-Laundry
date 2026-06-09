@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
+import { ListSkeleton, MetricSkeleton } from '@/components/Skeleton';
 import { supabase } from '@/lib/supabaseClient';
 import type { LaundryOrder, UserProfile } from '@/lib/types';
 
@@ -155,21 +156,31 @@ export function CustomerOrderHistory({ profile }: Props) {
       </section>
 
       <section className="grid three metric-grid">
-        <article className="panel metric-card">
-          <span>Aktif</span>
-          <strong>{stats.active}</strong>
-          <small>order berjalan</small>
-        </article>
-        <article className="panel metric-card">
-          <span>Belum lunas</span>
-          <strong>{stats.unpaid}</strong>
-          <small>perlu bayar atau verifikasi</small>
-        </article>
-        <article className="panel metric-card">
-          <span>Total transaksi</span>
-          <strong>{formatCurrency(stats.total)}</strong>
-          <small>semua order user ini</small>
-        </article>
+        {loading && orders.length === 0 ? (
+          <>
+            <MetricSkeleton />
+            <MetricSkeleton />
+            <MetricSkeleton />
+          </>
+        ) : (
+          <>
+            <article className="panel metric-card">
+              <span>Aktif</span>
+              <strong>{stats.active}</strong>
+              <small>order berjalan</small>
+            </article>
+            <article className="panel metric-card">
+              <span>Belum lunas</span>
+              <strong>{stats.unpaid}</strong>
+              <small>perlu bayar atau verifikasi</small>
+            </article>
+            <article className="panel metric-card">
+              <span>Total transaksi</span>
+              <strong>{formatCurrency(stats.total)}</strong>
+              <small>semua order user ini</small>
+            </article>
+          </>
+        )}
       </section>
 
       <section className="app-card">
@@ -194,7 +205,7 @@ export function CustomerOrderHistory({ profile }: Props) {
         </div>
 
         {message ? <div className="alert error">{message}</div> : null}
-        {loading ? <p className="muted">Memuat riwayat pesanan...</p> : null}
+        {loading && orders.length === 0 ? <ListSkeleton count={3} /> : null}
 
         <div className="history-list">
           {!loading && filteredOrders.length === 0 ? (
