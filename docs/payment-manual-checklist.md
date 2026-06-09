@@ -5,16 +5,36 @@ Checklist ini dipakai sebelum QRIS real dinyalakan. Fokusnya memastikan order fl
 ## Production Readiness
 
 - `MIDTRANS_IS_PRODUCTION=false` untuk sandbox, `true` untuk production.
-- Prefix `MIDTRANS_SERVER_KEY` harus cocok:
-  - Sandbox: `SB-Mid-server-...`
-  - Production: `Mid-server-...`
+- Ambil key dari dashboard Midtrans sesuai toggle environment:
+  - Sandbox: `dashboard.sandbox.midtrans.com` atau toggle `Sandbox`.
+  - Production: `dashboard.midtrans.com` atau toggle `Production`.
+- Beberapa dashboard sandbox tetap menampilkan key berawalan `Mid-server-...`. Jangan tebak environment hanya dari prefix.
+- Isi `MIDTRANS_KEY_ENV=sandbox` atau `MIDTRANS_KEY_ENV=production` supaya BFF bisa memverifikasi key secara tegas.
 - `BFF_PUBLIC_BASE_URL` atau `MIDTRANS_WEBHOOK_URL` harus memakai HTTPS sebelum production.
 - Webhook production diarahkan ke:
   - `https://domain-kamu/api/v1/payment/midtrans-webhook`
 - Cek endpoint BFF:
   - `http://127.0.0.1:8080/health`
 - Pastikan response `midtrans.key_matches_environment=true`.
+- Pastikan response `midtrans.key_environment_verified=true`.
 - Pastikan response `midtrans.webhook_https_ready=true` sebelum production.
+
+Contoh sandbox lokal:
+
+```env
+MIDTRANS_IS_PRODUCTION=false
+MIDTRANS_KEY_ENV=sandbox
+MIDTRANS_SERVER_KEY=<server-key-dari-dashboard-sandbox>
+```
+
+Contoh production:
+
+```env
+MIDTRANS_IS_PRODUCTION=true
+MIDTRANS_KEY_ENV=production
+MIDTRANS_SERVER_KEY=<server-key-dari-dashboard-production>
+MIDTRANS_WEBHOOK_URL=https://domain-kamu/api/v1/payment/midtrans-webhook
+```
 
 ## Sandbox QRIS Test
 

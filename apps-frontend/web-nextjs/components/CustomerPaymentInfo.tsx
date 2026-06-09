@@ -15,8 +15,10 @@ type Props = {
 type BffStatus = 'checking' | 'missing' | 'offline' | 'ready';
 type PaymentEnvironment = 'production' | 'sandbox' | 'unknown';
 type MidtransReadiness = {
+  keyEnvironmentVerified: boolean;
   keyMatchesEnvironment: boolean;
   productionReady: boolean;
+  serverKeyDetection: string;
   serverKeyMode: PaymentEnvironment;
   warnings: string[];
   webhookHttpsReady: boolean;
@@ -66,8 +68,10 @@ export function CustomerPaymentInfo({ profile }: Props) {
   const [hasPaymentSession, setHasPaymentSession] = useState(false);
   const [paymentEnvironment, setPaymentEnvironment] = useState<PaymentEnvironment>('unknown');
   const [midtransReadiness, setMidtransReadiness] = useState<MidtransReadiness>({
+    keyEnvironmentVerified: false,
     keyMatchesEnvironment: false,
     productionReady: false,
+    serverKeyDetection: 'unknown',
     serverKeyMode: 'unknown',
     warnings: [],
     webhookHttpsReady: false,
@@ -235,8 +239,12 @@ export function CustomerPaymentInfo({ profile }: Props) {
           setBffStatus(response.ok ? 'ready' : 'offline');
           setPaymentEnvironment(response.ok ? nextEnvironment : 'unknown');
           setMidtransReadiness({
+            keyEnvironmentVerified: Boolean(payload?.midtrans?.key_environment_verified),
             keyMatchesEnvironment: Boolean(payload?.midtrans?.key_matches_environment),
             productionReady: Boolean(payload?.midtrans?.production_ready),
+            serverKeyDetection: typeof payload?.midtrans?.server_key_detection === 'string'
+              ? payload.midtrans.server_key_detection
+              : 'unknown',
             serverKeyMode: nextServerKeyMode,
             warnings: Array.isArray(payload?.midtrans?.warnings) ? payload.midtrans.warnings : [],
             webhookHttpsReady: Boolean(payload?.midtrans?.webhook_https_ready),
@@ -360,9 +368,11 @@ export function CustomerPaymentInfo({ profile }: Props) {
             <i className="fi fi-rr-settings" aria-hidden />
             MIDTRANS_IS_PRODUCTION: {paymentEnvironment === 'production' ? 'true' : paymentEnvironment === 'sandbox' ? 'false' : 'dicek'}
           </span>
-          <span className={midtransReadiness.keyMatchesEnvironment ? 'ready' : ''}>
+          <span className={midtransReadiness.keyEnvironmentVerified && midtransReadiness.keyMatchesEnvironment ? 'ready' : ''}>
             <i className="fi fi-rr-key" aria-hidden />
-            Server key: {midtransReadiness.serverKeyMode === 'unknown' ? 'prefix tidak dikenali' : midtransReadiness.serverKeyMode}
+            Server key: {midtransReadiness.serverKeyMode === 'unknown'
+              ? 'perlu MIDTRANS_KEY_ENV'
+              : `${midtransReadiness.serverKeyMode}${midtransReadiness.serverKeyDetection === 'env' ? ' (env)' : ''}`}
           </span>
           <span className={paymentEnvironment !== 'production' || midtransReadiness.webhookHttpsReady ? 'ready' : ''}>
             <i className="fi fi-rr-link" aria-hidden />

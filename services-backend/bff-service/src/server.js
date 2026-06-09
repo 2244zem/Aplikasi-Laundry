@@ -15,6 +15,7 @@ const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const midtransServerKey = process.env.MIDTRANS_SERVER_KEY;
 const midtransIsProduction = process.env.MIDTRANS_IS_PRODUCTION === 'true';
+const midtransKeyEnvironment = (process.env.MIDTRANS_KEY_ENV || '').toLowerCase();
 const publicBffBaseUrl = process.env.BFF_PUBLIC_BASE_URL || process.env.PUBLIC_BFF_BASE_URL || '';
 const configuredMidtransWebhookUrl = process.env.MIDTRANS_WEBHOOK_URL || '';
 const whatsappApiUrl = process.env.WHATSAPP_API_URL;
@@ -38,16 +39,38 @@ function midtransAuthHeader() {
   return `Basic ${Buffer.from(`${midtransServerKey}:`).toString('base64')}`;
 }
 
+function configuredMidtransKeyEnvironment() {
+  return ['sandbox', 'production'].includes(midtransKeyEnvironment) ? midtransKeyEnvironment : '';
+}
+
 function classifyMidtransServerKey() {
+  const configuredEnvironment = configuredMidtransKeyEnvironment();
+
+  if (configuredEnvironment) {
+    return {
+      mode: configuredEnvironment,
+      source: 'env',
+    };
+  }
+
   if (midtransServerKey.startsWith('SB-Mid-server-')) {
-    return 'sandbox';
+    return {
+      mode: 'sandbox',
+      source: 'prefix',
+    };
   }
 
   if (midtransServerKey.startsWith('Mid-server-')) {
-    return 'production';
+    return {
+      mode: 'unknown',
+      source: 'modern-prefix',
+    };
   }
 
-  return 'unknown';
+  return {
+    mode: 'unknown',
+    source: 'unknown',
+  };
 }
 
 function resolveMidtransWebhookUrl() {
@@ -64,18 +87,24 @@ function resolveMidtransWebhookUrl() {
 
 function buildMidtransReadiness() {
   const environment = midtransIsProduction ? 'production' : 'sandbox';
-  const serverKeyMode = classifyMidtransServerKey();
+  const serverKey = classifyMidtransServerKey();
+  const serverKeyMode = serverKey.mode;
+  const keyEnvironmentVerified = serverKeyMode !== 'unknown';
   const webhookUrl = resolveMidtransWebhookUrl();
-  const keyMatchesEnvironment = serverKeyMode === environment;
+  const keyMatchesEnvironment = keyEnvironmentVerified ? serverKeyMode === environment : true;
   const webhookUrlConfigured = Boolean(webhookUrl);
   const webhookHttpsReady = webhookUrl.startsWith('https://');
   const warnings = [];
 
-  if (!keyMatchesEnvironment) {
+  if (!keyEnvironmentVerified) {
     warnings.push(
-      serverKeyMode === 'unknown'
-        ? 'Prefix MIDTRANS_SERVER_KEY tidak dikenali. Sandbox biasanya SB-Mid-server-..., production biasanya Mid-server-....'
-        : `MIDTRANS_IS_PRODUCTION=${midtransIsProduction} tetapi server key terlihat seperti ${serverKeyMode}.`,
+      'Checker tidak bisa memastikan key ini sandbox/production dari prefix. Jika dashboard Sandbox aktif, isi MIDTRANS_KEY_ENV=sandbox.',
+    );
+  }
+
+  if (keyEnvironmentVerified && !keyMatchesEnvironment) {
+    warnings.push(
+      `MIDTRANS_IS_PRODUCTION=${midtransIsProduction} tetapi MIDTRANS_KEY_ENV/server key terbaca ${serverKeyMode}.`,
     );
   }
 
@@ -89,8 +118,10 @@ function buildMidtransReadiness() {
 
   return {
     environment,
+    key_environment_verified: keyEnvironmentVerified,
     key_matches_environment: keyMatchesEnvironment,
-    production_ready: midtransIsProduction && keyMatchesEnvironment && webhookHttpsReady,
+    production_ready: midtransIsProduction && keyEnvironmentVerified && keyMatchesEnvironment && webhookHttpsReady,
+    server_key_detection: serverKey.source,
     server_key_mode: serverKeyMode,
     webhook_https_ready: webhookHttpsReady,
     webhook_url_configured: webhookUrlConfigured,
