@@ -33,6 +33,26 @@ const adminNavItems: NavItem[] = [
   { href: '/admin/finance', icon: 'fi-rr-receipt', label: { id: 'Keuangan', en: 'Finance' }, matches: (path) => path.startsWith('/admin/finance') },
 ];
 
+function navItemsForProfile(profile: UserProfile | null) {
+  if (!profile) {
+    return userNavItems;
+  }
+
+  if (profile.role === 'SUPERADMIN' || profile.role === 'ADMIN' || profile.staff_role === 'OWNER') {
+    return adminNavItems;
+  }
+
+  if (profile.staff_role === 'KASIR') {
+    return adminNavItems.filter((item) => !item.href.startsWith('/admin/finance'));
+  }
+
+  if (profile.staff_role === 'TUKANG_CUCI') {
+    return adminNavItems.filter((item) => item.href.startsWith('/admin/dashboard') || item.href.startsWith('/admin/chat'));
+  }
+
+  return userNavItems;
+}
+
 function detectDeviceMode() {
   if (typeof window === 'undefined') {
     return null;
@@ -139,8 +159,8 @@ export function AppShell({ children }: Readonly<{ children: React.ReactNode }>) 
     };
   }, []);
 
-  const isAdmin = profile?.role === 'ADMIN' || profile?.role === 'SUPERADMIN';
-  const navItems = profileLoading ? [] : isAdmin ? adminNavItems : userNavItems;
+  const isAdmin = profile?.role === 'ADMIN' || profile?.role === 'SUPERADMIN' || Boolean(profile?.staff_role);
+  const navItems = profileLoading ? [] : navItemsForProfile(profile);
   const shellClass = `device-stage ${mode ? `device-${mode}` : 'device-fluid'}`;
   const currentHash = typeof window === 'undefined' ? '' : window.location.hash;
 

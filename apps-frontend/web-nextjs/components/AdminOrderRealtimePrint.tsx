@@ -2,9 +2,13 @@
 
 import type { CSSProperties } from 'react';
 import { useEffect, useState } from 'react';
+import { AdminQrScannerPanel } from '@/components/AdminQrScannerPanel';
+import { AdminRetentionPanel } from '@/components/AdminRetentionPanel';
 import { AdminServicePricingPanel } from '@/components/AdminServicePricingPanel';
+import { AdminStaffAccessPanel } from '@/components/AdminStaffAccessPanel';
 import { InteractiveChatLaundry } from '@/components/InteractiveChatLaundry';
 import { ListSkeleton } from '@/components/Skeleton';
+import { canEditOrderCommercials, canOperateOrders, operatorOutletId } from '@/lib/access';
 import { supabase } from '@/lib/supabaseClient';
 import type { LaundryOrder, UserProfile } from '@/lib/types';
 
@@ -99,6 +103,81 @@ function printOrder(order: LaundryOrder) {
   return true;
 }
 
+function qrPayload(order: LaundryOrder) {
+  return `UNGU:${order.qr_token || order.id}`;
+}
+
+function qrImageUrl(order: LaundryOrder) {
+  return `https://api.qrserver.com/v1/create-qr-code/?size=160x160&margin=1&data=${encodeURIComponent(qrPayload(order))}`;
+}
+
+async function printQrLabel(order: LaundryOrder) {
+  const printWindow = window.open('', '_blank', 'width=360,height=520');
+
+  if (!printWindow) {
+    return false;
+  }
+
+  printWindow.document.open();
+  printWindow.document.write(`
+    <html>
+      <head>
+        <title>Ungu Laundry QR ${escapeHtml(order.id.slice(0, 8))}</title>
+        <style>
+          body {
+            width: 58mm;
+            margin: 0;
+            padding: 8px;
+            font-family: Arial, sans-serif;
+            color: #111827;
+            text-align: center;
+          }
+
+          img {
+            height: 120px;
+            margin: 6px auto;
+            width: 120px;
+          }
+
+          h1 {
+            font-size: 15px;
+            margin: 0 0 5px;
+          }
+
+          p {
+            font-size: 12px;
+            margin: 4px 0;
+          }
+
+          strong {
+            display: block;
+            font-family: "Courier New", monospace;
+            font-size: 13px;
+            margin-top: 6px;
+          }
+        </style>
+      </head>
+      <body>
+        <h1>UNGU LAUNDRY</h1>
+        <p>Label keranjang cucian</p>
+        <img src="${qrImageUrl(order)}" alt="QR Order" />
+        <strong>${escapeHtml(qrPayload(order))}</strong>
+        <p>#${escapeHtml(order.id.slice(0, 8))} - ${escapeHtml(order.format_detail?.paket || 'Laundry')}</p>
+        <script>
+          window.onload = function () {
+            window.print();
+            window.setTimeout(function () { window.close(); }, 300);
+          };
+        </script>
+      </body>
+    </html>
+  `);
+  printWindow.document.close();
+
+  await supabase.from('tabel_order').update({ qr_label_printed_at: new Date().toISOString() }).eq('id', order.id);
+  return true;
+}
+
 function formatCurrency(value: number) {
   return new Intl.NumberFormat('id-ID', {
     currency: 'IDR',
@@ -133,8 +212,10 @@ function OrderCard({ order, profile, onChange, onOpenChat }: OrderRowProps) {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
   const detail = order.format_detail ?? {};
-  const canClaim = !order.admin_outlet_id;
-  const canEdit = order.admin_outlet_id === profile.id || profile.role === 'SUPERADMIN';
+  const outletId = operatorOutletId(profile);
+  const canClaim = !order.admin_outlet_id && canEditOrderCommercials(profile);
+  const canEdit = order.admin_outlet_id === outletId || profile.role === 'SUPERADMIN';
+  const canEditCommercials = canEdit && canEditOrderCommercials(profile);
   const statusIndex = Math.max(0, statusOptions.indexOf(order.status_order));
 
   useEffect(() => {
@@ -195,6 +276,34 @@ function OrderCard({ order, profile, onChange, onOpenChat }: OrderRowProps) {
     setMessage('Order diperbarui.');
   }
 
+  function shareCourierLocation() {
+    setMessage('');
+
+    if (!navigator.geolocation) {
+      setMessage('Browser tidak mendukung lokasi kurir.');
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const { error } = await supabase.from('tabel_courier_location').upsert(
+          {
+            courier_user_id: profile.id,
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+            order_id: order.id,
+            speed_kmh: position.coords.speed ? Number(position.coords.speed) * 3.6 : null,
+          },
+          { onConflict: 'order_id' },
+        );
+
+        setMessage(error ? error.message : 'Lokasi kurir dikirim ke user.');
+      },
+      () => setMessage('Izin lokasi ditolak. Aktifkan permission lokasi untuk tracking pickup.'),
+      { enableHighAccuracy: true, maximumAge: 15000, timeout: 10000 },
+    );
+  }
+
   return (
     <article className="order-ticket">
       <div className="ticket-head">
@@ -236,7 +345,7 @@ function OrderCard({ order, profile, onChange, onOpenChat }: OrderRowProps) {
         <div className="ticket-edit">
           <input
             className="input"
-            disabled={!canEdit}
+            disabled={!canEditCommercials}
             min={0}
             onChange={(event) => setBeratKg(Number(event.target.value))}
             step="0.1"
@@ -246,7 +355,7 @@ function OrderCard({ order, profile, onChange, onOpenChat }: OrderRowProps) {
           />
           <input
             className="input"
-            disabled={!canEdit}
+            disabled={!canEditCommercials}
             min={0}
             onChange={(event) => setTotalHarga(Number(event.target.value))}
             step="500"
@@ -289,6 +398,14 @@ function OrderCard({ order, profile, onChange, onOpenChat }: OrderRowProps) {
           <button className="button secondary" onClick={() => printOrder(order)} type="button">
             <i className="fi fi-rr-print" aria-hidden />
             Print
+          </button>
+          <button className="button secondary" onClick={() => void printQrLabel(order)} type="button">
+            <i className="fi fi-rr-qr-scan" aria-hidden />
+            Label QR
+          </button>
+          <button className="button secondary" disabled={!canEditCommercials} onClick={shareCourierLocation} type="button">
+            <i className="fi fi-rr-location-crosshairs" aria-hidden />
+            Lokasi
           </button>
           <button className="button secondary" onClick={() => onOpenChat(order)} type="button">
             <i className="fi fi-rr-comment-alt" aria-hidden />
@@ -494,8 +611,8 @@ export function AdminOrderRealtimePrint({ profile }: Props) {
   const [selectedChatOrder, setSelectedChatOrder] = useState<LaundryOrder | null>(null);
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState('');
-  const isActiveAdmin =
-    profile.role === 'SUPERADMIN' || (profile.role === 'ADMIN' && profile.status_langganan === 'ACTIVE');
+  const isActiveAdmin = canOperateOrders(profile);
+  const outletId = operatorOutletId(profile);
 
   async function loadOrders() {
     setLoading(true);
@@ -508,7 +625,9 @@ export function AdminOrderRealtimePrint({ profile }: Props) {
       .limit(30);
 
     if (profile.role !== 'SUPERADMIN') {
-      request = request.or(`admin_outlet_id.is.null,admin_outlet_id.eq.${profile.id}`);
+      request = profile.staff_role
+        ? request.eq('admin_outlet_id', outletId)
+        : request.or(`admin_outlet_id.is.null,admin_outlet_id.eq.${outletId}`);
     }
 
     const { data, error } = await request;
@@ -527,7 +646,7 @@ export function AdminOrderRealtimePrint({ profile }: Props) {
     return (
       profile.role === 'SUPERADMIN' ||
       nextOrder.admin_outlet_id == null ||
-      nextOrder.admin_outlet_id === profile.id
+      nextOrder.admin_outlet_id === outletId
     );
   }
 
@@ -617,8 +736,21 @@ export function AdminOrderRealtimePrint({ profile }: Props) {
 
   return (
     <div className="grid admin-dashboard">
-      <AdminOutletStudio profile={profile} />
-      <AdminServicePricingPanel profile={profile} />
+      {!profile.staff_role ? (
+        <>
+          <AdminOutletStudio profile={profile} />
+          <AdminServicePricingPanel profile={profile} />
+        </>
+      ) : (
+        <section className="panel soft">
+          <p className="eyebrow">Mode staff</p>
+          <h1>{profile.staff_role}</h1>
+          <p className="muted">Akses kamu dibatasi untuk operasional outlet sesuai role dari owner.</p>
+        </section>
+      )}
+      <AdminStaffAccessPanel profile={profile} />
+      <AdminRetentionPanel profile={profile} />
+      <AdminQrScannerPanel onScanned={syncOrder} profile={profile} />
 
       <section className="ops-hero">
         <div className="page-header">

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { InteractiveChatLaundry } from '@/components/InteractiveChatLaundry';
 import { ListSkeleton } from '@/components/Skeleton';
+import { canOperateOrders, operatorOutletId } from '@/lib/access';
 import { supabase } from '@/lib/supabaseClient';
 import type { ChatMessage, LaundryOrder, UserProfile } from '@/lib/types';
 
@@ -38,8 +39,8 @@ export function AdminChatInbox({ profile }: Props) {
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState('');
 
-  const isActiveAdmin =
-    profile.role === 'SUPERADMIN' || (profile.role === 'ADMIN' && profile.status_langganan === 'ACTIVE');
+  const isActiveAdmin = canOperateOrders(profile);
+  const outletId = operatorOutletId(profile);
 
   async function loadInbox() {
     setLoading(true);
@@ -52,7 +53,7 @@ export function AdminChatInbox({ profile }: Props) {
       .limit(80);
 
     if (profile.role !== 'SUPERADMIN') {
-      orderRequest = orderRequest.eq('admin_outlet_id', profile.id);
+      orderRequest = orderRequest.eq('admin_outlet_id', outletId);
     }
 
     const { data: orderData, error: orderError } = await orderRequest;
@@ -97,7 +98,7 @@ export function AdminChatInbox({ profile }: Props) {
     }
 
     void loadInbox();
-  }, [isActiveAdmin, profile.id, profile.role]);
+  }, [isActiveAdmin, outletId, profile.role]);
 
   useEffect(() => {
     if (!isActiveAdmin) {

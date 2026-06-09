@@ -4,6 +4,8 @@ export type UserProfile = {
   nama: string;
   email: string;
   role: 'USER' | 'ADMIN' | 'SUPERADMIN';
+  staff_role: 'OWNER' | 'KASIR' | 'TUKANG_CUCI' | null;
+  staff_outlet_id: string | null;
   status_langganan: 'ACTIVE' | 'INACTIVE';
   tgl_kadaluwarsa_langganan: string | null;
   nama_toko: string | null;
@@ -53,6 +55,8 @@ export type LaundryOrder = {
     | 'DIBATALKAN';
   status_pembayaran: 'UNPAID' | 'PENDING' | 'PAID' | 'FAILED' | 'REFUNDED';
   midtrans_order_id: string | null;
+  qr_token: string;
+  qr_label_printed_at: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -113,6 +117,30 @@ export type InventoryItem = {
   updated_at: string;
 };
 
+export type InventoryUsageRule = {
+  id: string;
+  admin_id: string;
+  inventory_item_id: string;
+  service_id: string | null;
+  konsumsi_per_kg: number;
+  konsumsi_per_order: number;
+  aktif: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type InventoryMovement = {
+  id: string;
+  admin_id: string;
+  inventory_item_id: string;
+  order_id: string | null;
+  movement_type: 'MANUAL' | 'AUTO_DEDUCTION' | 'ADJUSTMENT';
+  qty_delta: number;
+  stok_setelah: number | null;
+  catatan: string | null;
+  created_at: string;
+};
+
 export type ServicePricing = {
   id: string;
   admin_id: string;
@@ -123,6 +151,39 @@ export type ServicePricing = {
   estimasi_menit: number;
   aktif: boolean;
   urutan: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type OrderEvent = {
+  id: string;
+  order_id: string;
+  actor_user_id: string | null;
+  event_type: 'STATUS_CHANGED' | string;
+  metadata: Record<string, unknown>;
+  created_at: string;
+};
+
+export type CourierLocation = {
+  id: string;
+  order_id: string;
+  courier_user_id: string | null;
+  latitude: number;
+  longitude: number;
+  heading: number | null;
+  speed_kmh: number | null;
+  updated_at: string;
+};
+
+export type CustomerRetentionQueue = {
+  id: string;
+  admin_id: string;
+  user_id: string;
+  last_order_at: string | null;
+  suggested_message: string;
+  status: 'PENDING' | 'SENT' | 'SKIPPED' | 'FAILED';
+  sent_at: string | null;
+  metadata: Record<string, unknown>;
   created_at: string;
   updated_at: string;
 };

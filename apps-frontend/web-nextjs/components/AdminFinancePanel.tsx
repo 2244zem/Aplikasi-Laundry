@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { ListSkeleton, MetricSkeleton, SkeletonBlock } from '@/components/Skeleton';
+import { canManageFinance, operatorOutletId } from '@/lib/access';
 import { supabase } from '@/lib/supabaseClient';
 import type { Expense, ExpenseCategory, MonthlyBalance, UserProfile } from '@/lib/types';
 
@@ -124,8 +125,8 @@ export function AdminFinancePanel({ profile }: Props) {
   const [balance, setBalance] = useState<MonthlyBalance | null>(null);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState('');
-  const isActiveAdmin =
-    profile.role === 'SUPERADMIN' || (profile.role === 'ADMIN' && profile.status_langganan === 'ACTIVE');
+  const isActiveAdmin = canManageFinance(profile);
+  const outletId = operatorOutletId(profile);
 
   const expenseTotal = useMemo(
     () => expenses.reduce((total, expense) => total + Number(expense.nominal), 0),
@@ -168,14 +169,14 @@ export function AdminFinancePanel({ profile }: Props) {
       supabase
         .from('tabel_pengeluaran')
         .select('*')
-        .eq('admin_id', profile.id)
+        .eq('admin_id', outletId)
         .gte('created_at', monthStart)
         .lt('created_at', nextMonthIso)
         .order('created_at', { ascending: false }),
       supabase
         .from('tabel_neraca_bulanan')
         .select('*')
-        .eq('admin_id', profile.id)
+        .eq('admin_id', outletId)
         .eq('bulan_tahun', period)
         .maybeSingle(),
     ]);
@@ -203,7 +204,7 @@ export function AdminFinancePanel({ profile }: Props) {
     }
 
     void loadFinance();
-  }, [isActiveAdmin, period, profile.id]);
+  }, [isActiveAdmin, period, outletId]);
 
   async function handleCreateExpense(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -211,7 +212,7 @@ export function AdminFinancePanel({ profile }: Props) {
     setMessage('');
 
     const { error } = await supabase.from('tabel_pengeluaran').insert({
-      admin_id: profile.id,
+      admin_id: outletId,
       kategori: category,
       nominal: amount,
       keterangan: note.trim() || null,

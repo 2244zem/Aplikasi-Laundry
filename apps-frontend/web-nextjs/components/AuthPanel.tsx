@@ -56,7 +56,7 @@ export function AuthPanel({ children }: AuthPanelProps) {
   }
 
   function isAdminProfile(nextProfile: UserProfile) {
-    return nextProfile.role === 'ADMIN' || nextProfile.role === 'SUPERADMIN';
+    return nextProfile.role === 'ADMIN' || nextProfile.role === 'SUPERADMIN' || Boolean(nextProfile.staff_role);
   }
 
   function routeAfterAuth(nextProfile: UserProfile) {

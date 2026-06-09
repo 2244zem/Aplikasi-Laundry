@@ -3,8 +3,9 @@
 import type { FormEvent } from 'react';
 import { useEffect, useMemo, useState } from 'react';
 import { ListSkeleton, MetricSkeleton } from '@/components/Skeleton';
+import { canManageInventory, operatorOutletId } from '@/lib/access';
 import { supabase } from '@/lib/supabaseClient';
-import type { InventoryItem, UserProfile } from '@/lib/types';
+import type { InventoryItem, InventoryMovement, InventoryUsageRule, UserProfile } from '@/lib/types';
 
 type Props = {
   profile: UserProfile;
@@ -40,14 +41,17 @@ function isLowStock(item: InventoryItem) {
 
 export function AdminInventoryPanel({ profile }: Props) {
   const [items, setItems] = useState<InventoryItem[]>([]);
+  const [rules, setRules] = useState<InventoryUsageRule[]>([]);
+  const [movements, setMovements] = useState<InventoryMovement[]>([]);
+  const [ruleDrafts, setRuleDrafts] = useState<Record<string, number>>({});
   const [form, setForm] = useState<InventoryForm>(emptyForm);
   const [editingId, setEditingId] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
 
-  const isActiveAdmin =
-    profile.role === 'SUPERADMIN' || (profile.role === 'ADMIN' && profile.status_langganan === 'ACTIVE');
+  const isActiveAdmin = canManageInventory(profile);
+  const outletId = operatorOutletId(profile);
 
   const summary = useMemo(() => {
     const low = items.filter(isLowStock).length;
@@ -59,25 +63,47 @@ export function AdminInventoryPanel({ profile }: Props) {
     () => items.filter(isLowStock).map((item) => item.nama_barang).slice(0, 3),
     [items],
   );
+  const rulesByItem = useMemo(() => {
+    return new Map(rules.filter((rule) => !rule.service_id).map((rule) => [rule.inventory_item_id, rule]));
+  }, [rules]);
 
   async function loadInventory() {
     setLoading(true);
     setMessage('');
 
-    const { data, error } = await supabase
-      .from('tabel_inventory_item')
-      .select('*')
-      .eq('admin_id', profile.id)
-      .order('updated_at', { ascending: false });
+    const [itemsResult, rulesResult, movementsResult] = await Promise.all([
+      supabase
+        .from('tabel_inventory_item')
+        .select('*')
+        .eq('admin_id', outletId)
+        .order('updated_at', { ascending: false }),
+      supabase
+        .from('tabel_inventory_usage_rule')
+        .select('*')
+        .eq('admin_id', outletId)
+        .order('updated_at', { ascending: false }),
+      supabase
+        .from('tabel_inventory_movement')
+        .select('*')
+        .eq('admin_id', outletId)
+        .order('created_at', { ascending: false })
+        .limit(8),
+    ]);
 
     setLoading(false);
 
-    if (error) {
-      setMessage(error.message);
+    if (itemsResult.error || rulesResult.error || movementsResult.error) {
+      setMessage(itemsResult.error?.message || rulesResult.error?.message || movementsResult.error?.message || 'Gagal memuat stok.');
       return;
     }
 
-    setItems((data ?? []) as InventoryItem[]);
+    const nextRules = (rulesResult.data ?? []) as InventoryUsageRule[];
+    setItems((itemsResult.data ?? []) as InventoryItem[]);
+    setRules(nextRules);
+    setMovements((movementsResult.data ?? []) as InventoryMovement[]);
+    setRuleDrafts(
+      Object.fromEntries(nextRules.filter((rule) => !rule.service_id).map((rule) => [rule.inventory_item_id, Number(rule.konsumsi_per_kg || 0)])),
+    );
   }
 
   useEffect(() => {
@@ -87,7 +113,7 @@ export function AdminInventoryPanel({ profile }: Props) {
     }
 
     void loadInventory();
-  }, [isActiveAdmin, profile.id]);
+  }, [isActiveAdmin, outletId]);
 
   useEffect(() => {
     if (!isActiveAdmin) {
@@ -95,12 +121,12 @@ export function AdminInventoryPanel({ profile }: Props) {
     }
 
     const channel = supabase
-      .channel(`ungu-laundry:inventory:${profile.id}`)
+      .channel(`ungu-laundry:inventory:${outletId}`)
       .on(
         'postgres_changes',
         {
           event: '*',
-          filter: `admin_id=eq.${profile.id}`,
+          filter: `admin_id=eq.${outletId}`,
           schema: 'public',
           table: 'tabel_inventory_item',
         },
@@ -113,7 +139,7 @@ export function AdminInventoryPanel({ profile }: Props) {
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [isActiveAdmin, profile.id]);
+  }, [isActiveAdmin, outletId]);
 
   function editItem(item: InventoryItem) {
     setEditingId(item.id);
@@ -138,7 +164,7 @@ export function AdminInventoryPanel({ profile }: Props) {
     setMessage('');
 
     const payload = {
-      admin_id: profile.id,
+      admin_id: outletId,
       catatan: form.catatan.trim() || null,
       kategori: form.kategori.trim() || 'OPERASIONAL',
       nama_barang: form.nama_barang.trim(),
@@ -189,7 +215,7 @@ export function AdminInventoryPanel({ profile }: Props) {
     const { error } = await supabase.from('tabel_inventory_item').insert(
       starterItems.map((item) => ({
         ...item,
-        admin_id: profile.id,
+        admin_id: outletId,
       })),
     );
 
@@ -201,6 +227,35 @@ export function AdminInventoryPanel({ profile }: Props) {
     }
 
     setMessage('Starter stock ditambahkan.');
+    await loadInventory();
+  }
+
+  async function saveUsageRule(item: InventoryItem) {
+    setSaving(true);
+    setMessage('');
+
+    const existingRule = rulesByItem.get(item.id);
+    const payload = {
+      aktif: true,
+      admin_id: outletId,
+      inventory_item_id: item.id,
+      konsumsi_per_kg: Number(ruleDrafts[item.id] || 0),
+      konsumsi_per_order: 0,
+      service_id: null,
+    };
+    const request = existingRule
+      ? supabase.from('tabel_inventory_usage_rule').update(payload).eq('id', existingRule.id)
+      : supabase.from('tabel_inventory_usage_rule').insert(payload);
+    const { error } = await request;
+
+    setSaving(false);
+
+    if (error) {
+      setMessage(error.message);
+      return;
+    }
+
+    setMessage(`Aturan auto deduct ${item.nama_barang} disimpan.`);
     await loadInventory();
   }
 
@@ -400,6 +455,22 @@ export function AdminInventoryPanel({ profile }: Props) {
                   <span>{item.satuan}</span>
                   <em>{isLowStock(item) ? 'Stok rendah' : 'Aman'}</em>
                 </div>
+                <div className="inventory-rule-control">
+                  <label>
+                    <span>Auto / kg</span>
+                    <input
+                      className="input"
+                      min={0}
+                      onChange={(event) => setRuleDrafts((current) => ({ ...current, [item.id]: Number(event.target.value) }))}
+                      step="0.1"
+                      type="number"
+                      value={ruleDrafts[item.id] ?? Number(rulesByItem.get(item.id)?.konsumsi_per_kg || 0)}
+                    />
+                  </label>
+                  <button className="button secondary" disabled={saving} onClick={() => saveUsageRule(item)} type="button">
+                    Simpan aturan
+                  </button>
+                </div>
                 <div className="actions">
                   <button className="button secondary" onClick={() => editItem(item)} type="button">
                     <i className="fi fi-rr-edit" aria-hidden />
@@ -413,6 +484,45 @@ export function AdminInventoryPanel({ profile }: Props) {
             ))}
           </div>
         </section>
+      </section>
+
+      <section className="app-card inventory-movement-panel">
+        <div className="section-heading compact">
+          <div>
+            <p className="eyebrow">Auto deduction</p>
+            <h2>Riwayat pemakaian stok</h2>
+          </div>
+          <span className="status subtle">{movements.length} event</span>
+        </div>
+
+        <div className="inventory-list">
+          {movements.length === 0 ? (
+            <div className="empty-state compact">
+              <i className="fi fi-rr-refresh" aria-hidden />
+              <strong>Belum ada pemakaian otomatis</strong>
+              <span>Ketika order selesai, aturan per kg akan mengurangi stok dan muncul di sini.</span>
+            </div>
+          ) : null}
+
+          {movements.map((movement) => (
+            <article className="inventory-card movement" key={movement.id}>
+              <div>
+                <span className="inventory-icon">
+                  <i className="fi fi-rr-arrow-trend-down" aria-hidden />
+                </span>
+                <div>
+                  <strong>{movement.movement_type}</strong>
+                  <small>{movement.catatan || 'Perubahan stok'} - {new Date(movement.created_at).toLocaleString('id-ID')}</small>
+                </div>
+              </div>
+              <div className="inventory-stock">
+                <strong>{Number(movement.qty_delta)}</strong>
+                <span>delta</span>
+                <em>stok akhir {movement.stok_setelah ?? '-'}</em>
+              </div>
+            </article>
+          ))}
+        </div>
       </section>
     </div>
   );

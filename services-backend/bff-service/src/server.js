@@ -15,6 +15,8 @@ const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const midtransServerKey = process.env.MIDTRANS_SERVER_KEY;
 const midtransIsProduction = process.env.MIDTRANS_IS_PRODUCTION === 'true';
+const whatsappApiUrl = process.env.WHATSAPP_API_URL;
+const whatsappApiToken = process.env.WHATSAPP_API_TOKEN;
 
 if (!supabaseUrl || !supabaseServiceRoleKey || !midtransServerKey) {
   throw new Error('Missing SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, or MIDTRANS_SERVER_KEY.');
@@ -32,6 +34,32 @@ function midtransSnapUrl() {
 
 function midtransAuthHeader() {
   return `Basic ${Buffer.from(`${midtransServerKey}:`).toString('base64')}`;
+}
+
+async function sendWhatsappMessage({ message, phoneNumber }) {
+  if (!whatsappApiUrl || !whatsappApiToken || !phoneNumber) {
+    return { skipped: true };
+  }
+
+  const response = await fetch(whatsappApiUrl, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${whatsappApiToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      message,
+      to: phoneNumber,
+    }),
+  });
+
+  const payload = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    throw new Error(payload.error || payload.message || 'WhatsApp provider rejected the message.');
+  }
+
+  return { payload, skipped: false };
 }
 
 function verifyMidtransSignature(payload) {
@@ -301,6 +329,117 @@ app.post('/api/v1/payment/midtrans-webhook', async (req, res) => {
   } catch (error) {
     console.error('Midtrans webhook handling failed:', error);
     return res.status(500).json({ ok: false, error: 'Webhook handling failed.' });
+  }
+});
+
+app.post('/api/v1/crm/run-retention-scan', async (req, res) => {
+  const { adminId, days = 14 } = req.body;
+
+  if (!adminId) {
+    return res.status(400).json({ ok: false, error: 'Missing adminId.' });
+  }
+
+  const threshold = new Date();
+  threshold.setDate(threshold.getDate() - Number(days || 14));
+
+  try {
+    const { data: orders, error } = await supabase
+      .from('tabel_order')
+      .select('*, tabel_user:user_id(id,nama,email)')
+      .eq('admin_outlet_id', adminId)
+      .eq('status_order', 'SELESAI')
+      .lt('updated_at', threshold.toISOString())
+      .order('updated_at', { ascending: false })
+      .limit(200);
+
+    if (error) {
+      throw error;
+    }
+
+    const latestByUser = new Map();
+    (orders || []).forEach((order) => {
+      if (!latestByUser.has(order.user_id)) {
+        latestByUser.set(order.user_id, order);
+      }
+    });
+
+    const rows = Array.from(latestByUser.values()).map((order) => ({
+      admin_id: adminId,
+      last_order_at: order.updated_at,
+      metadata: {
+        email: order.tabel_user?.email,
+        order_id: order.id,
+        paket: order.format_detail?.paket,
+      },
+      suggested_message: `Halo ${order.tabel_user?.nama || 'kak'}! Sudah ${days} hari belum laundry lagi. Ada diskon 10% khusus untuk layanan ${order.format_detail?.paket || 'favorit'} minggu ini di Ungu Laundry.`,
+      user_id: order.user_id,
+    }));
+
+    if (rows.length > 0) {
+      const { error: insertError } = await supabase.from('tabel_customer_retention_queue').insert(rows);
+
+      if (insertError && !String(insertError.message).includes('duplicate')) {
+        throw insertError;
+      }
+    }
+
+    return res.json({ ok: true, count: rows.length });
+  } catch (error) {
+    console.error('Retention scan failed:', error);
+    return res.status(500).json({ ok: false, error: 'Retention scan failed.' });
+  }
+});
+
+app.post('/api/v1/crm/send-retention/:id', async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const { data: queueItem, error } = await supabase
+      .from('tabel_customer_retention_queue')
+      .select('*')
+      .eq('id', id)
+      .maybeSingle();
+
+    if (error) {
+      throw error;
+    }
+
+    if (!queueItem) {
+      return res.status(404).json({ ok: false, error: 'Queue item not found.' });
+    }
+
+    const phoneNumber = queueItem.metadata?.phone_number || queueItem.metadata?.phone;
+    const sendResult = await sendWhatsappMessage({
+      message: queueItem.suggested_message,
+      phoneNumber,
+    });
+
+    const { error: updateError } = await supabase
+      .from('tabel_customer_retention_queue')
+      .update({
+        metadata: {
+          ...queueItem.metadata,
+          whatsapp_result: sendResult,
+        },
+        sent_at: sendResult.skipped ? null : new Date().toISOString(),
+        status: sendResult.skipped ? 'PENDING' : 'SENT',
+      })
+      .eq('id', id);
+
+    if (updateError) {
+      throw updateError;
+    }
+
+    return res.json({ ok: true, skipped: sendResult.skipped });
+  } catch (error) {
+    console.error('Retention send failed:', error);
+
+    await supabase
+      .from('tabel_customer_retention_queue')
+      .update({ status: 'FAILED' })
+      .eq('id', id);
+
+    return res.status(500).json({ ok: false, error: 'Retention send failed.' });
   }
 });
 
