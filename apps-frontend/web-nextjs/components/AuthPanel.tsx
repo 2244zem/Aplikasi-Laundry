@@ -8,6 +8,7 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { ListSkeleton, SkeletonBlock } from '@/components/Skeleton';
 import { supabase } from '@/lib/supabaseClient';
 import { ensureProfile } from '@/lib/profile';
+import { getValidatedAuthSession } from '@/lib/authSession';
 import type { UserProfile } from '@/lib/types';
 
 type AuthState = {
@@ -74,18 +75,17 @@ export function AuthPanel({ children }: AuthPanelProps) {
   }
 
   const refreshProfile = useCallback(async () => {
-    const {
-      data: { session: currentSession },
-    } = await supabase.auth.getSession();
+    const { session: currentSession, user, errorMessage } = await getValidatedAuthSession();
 
     setSession(currentSession);
 
-    if (!currentSession?.user) {
+    if (!currentSession || !user) {
       setProfile(null);
+      setMessage(errorMessage ?? '');
       return;
     }
 
-    const nextProfile = await ensureProfile(currentSession.user, nama);
+    const nextProfile = await ensureProfile(user, nama);
     setProfile(nextProfile);
   }, [nama]);
 
@@ -94,9 +94,7 @@ export function AuthPanel({ children }: AuthPanelProps) {
 
     async function loadSession() {
       try {
-        const {
-          data: { session: currentSession },
-        } = await supabase.auth.getSession();
+        const { session: currentSession, user, errorMessage } = await getValidatedAuthSession();
 
         if (!mounted) {
           return;
@@ -104,11 +102,13 @@ export function AuthPanel({ children }: AuthPanelProps) {
 
         setSession(currentSession);
 
-        if (currentSession?.user) {
-          const nextProfile = await ensureProfile(currentSession.user);
+        if (currentSession && user) {
+          const nextProfile = await ensureProfile(user);
           if (mounted) {
             setProfile(nextProfile);
           }
+        } else if (errorMessage) {
+          setMessage(errorMessage);
         }
       } catch (error) {
         if (mounted) {
@@ -124,10 +124,13 @@ export function AuthPanel({ children }: AuthPanelProps) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, nextSession) => {
-      setSession(nextSession);
       if (!nextSession) {
+        setSession(null);
         setProfile(null);
+        return;
       }
+
+      void loadSession();
     });
 
     void loadSession();

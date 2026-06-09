@@ -5,6 +5,7 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { ensureProfile } from '@/lib/profile';
+import { getValidatedAuthSession } from '@/lib/authSession';
 import type { AppLanguage } from '@/lib/i18n';
 import { normalizeLanguage } from '@/lib/i18n';
 import type { UserProfile } from '@/lib/types';
@@ -116,11 +117,9 @@ export function AppShell({ children }: Readonly<{ children: React.ReactNode }>) 
     let mounted = true;
 
     async function loadProfile() {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
+      const { user } = await getValidatedAuthSession();
 
-      if (!session?.user) {
+      if (!user) {
         if (mounted) {
           setProfile(null);
           setProfileLoading(false);
@@ -129,7 +128,7 @@ export function AppShell({ children }: Readonly<{ children: React.ReactNode }>) 
       }
 
       try {
-        const nextProfile = await ensureProfile(session.user);
+        const nextProfile = await ensureProfile(user);
         if (mounted) {
           setProfile(nextProfile);
           setProfileLoading(false);

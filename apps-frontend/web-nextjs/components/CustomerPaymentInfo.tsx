@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { ListSkeleton } from '@/components/Skeleton';
 import { supabase } from '@/lib/supabaseClient';
+import { getValidatedAuthSession } from '@/lib/authSession';
 import type { LaundryOrder, UserProfile } from '@/lib/types';
 
 type Props = {
@@ -22,17 +23,19 @@ function formatCurrency(value: number) {
 
 function readPaymentError(payload: unknown, status: number) {
   if (payload && typeof payload === 'object') {
+    const code = (payload as { auth_code?: unknown }).auth_code;
+    const suffix = typeof code === 'string' ? ` (${code})` : '';
     const error = (payload as { error?: unknown }).error;
 
     if (typeof error === 'string') {
-      return error;
+      return `${error}${suffix}`;
     }
 
     if (error && typeof error === 'object') {
       const message = (error as { message?: unknown }).message;
 
       if (typeof message === 'string') {
-        return message;
+        return `${message}${suffix}`;
       }
 
       return JSON.stringify(error);
@@ -144,9 +147,7 @@ export function CustomerPaymentInfo({ profile }: Props) {
     let mounted = true;
 
     async function checkSession() {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
+      const { session } = await getValidatedAuthSession();
 
       if (!mounted) {
         return;
@@ -161,8 +162,13 @@ export function CustomerPaymentInfo({ profile }: Props) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
-      setHasPaymentSession(Boolean(session?.access_token));
-      setAuthChecked(true);
+      if (!session) {
+        setHasPaymentSession(false);
+        setAuthChecked(true);
+        return;
+      }
+
+      void checkSession();
     });
 
     return () => {
@@ -222,17 +228,12 @@ export function CustomerPaymentInfo({ profile }: Props) {
       return;
     }
 
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-    const freshSession = session?.access_token
-      ? session
-      : (await supabase.auth.refreshSession()).data.session;
+    const { session: freshSession, errorMessage } = await getValidatedAuthSession();
 
     if (!freshSession?.access_token) {
       setHasPaymentSession(false);
       setAuthChecked(true);
-      setMessage('Sesi login belum siap atau sudah kedaluwarsa. Login ulang, lalu buka halaman Bayar dari menu aplikasi.');
+      setMessage(errorMessage ?? 'Sesi login belum siap. Login ulang, lalu buka halaman Bayar dari menu aplikasi.');
       return;
     }
 

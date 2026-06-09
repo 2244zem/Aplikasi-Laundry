@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { ensureProfile } from '@/lib/profile';
-import { supabase } from '@/lib/supabaseClient';
+import { getValidatedAuthSession } from '@/lib/authSession';
 import { useAppLanguage } from '@/lib/i18n';
 import type { UserProfile } from '@/lib/types';
 import { UserDashboard } from '@/components/UserDashboard';
@@ -118,11 +118,9 @@ export function HomeExperience() {
     let mounted = true;
 
     async function loadSessionProfile() {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
+      const { user } = await getValidatedAuthSession();
 
-      if (!session?.user) {
+      if (!user) {
         if (mounted) {
           setProfile(null);
           setLoading(false);
@@ -130,7 +128,7 @@ export function HomeExperience() {
         return;
       }
 
-      const nextProfile = await ensureProfile(session.user);
+      const nextProfile = await ensureProfile(user);
 
       if (mounted) {
         setProfile(nextProfile);
