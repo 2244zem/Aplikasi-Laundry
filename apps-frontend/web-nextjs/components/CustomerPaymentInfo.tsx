@@ -12,6 +12,9 @@ type Props = {
 };
 
 type BffStatus = 'checking' | 'missing' | 'offline' | 'ready';
+type PaymentEnvironment = 'production' | 'sandbox' | 'unknown';
+
+const qrisSandboxSimulatorUrl = 'https://simulator.sandbox.midtrans.com/qris/index';
 
 function formatCurrency(value: number) {
   return new Intl.NumberFormat('id-ID', {
@@ -52,6 +55,7 @@ export function CustomerPaymentInfo({ profile }: Props) {
   const [message, setMessage] = useState('');
   const [authChecked, setAuthChecked] = useState(false);
   const [hasPaymentSession, setHasPaymentSession] = useState(false);
+  const [paymentEnvironment, setPaymentEnvironment] = useState<PaymentEnvironment>('unknown');
   const [bffStatus, setBffStatus] = useState<BffStatus>(
     process.env.NEXT_PUBLIC_BFF_BASE_URL ? 'checking' : 'missing',
   );
@@ -182,6 +186,7 @@ export function CustomerPaymentInfo({ profile }: Props) {
 
     if (!bffBaseUrl) {
       setBffStatus('missing');
+      setPaymentEnvironment('unknown');
       return;
     }
 
@@ -196,13 +201,17 @@ export function CustomerPaymentInfo({ profile }: Props) {
           cache: 'no-store',
           signal: controller.signal,
         });
+        const payload = await response.json().catch(() => ({}));
+        const nextEnvironment = payload?.midtrans_environment === 'production' ? 'production' : 'sandbox';
 
         if (mounted) {
           setBffStatus(response.ok ? 'ready' : 'offline');
+          setPaymentEnvironment(response.ok ? nextEnvironment : 'unknown');
         }
       } catch (_error) {
         if (mounted && !controller.signal.aborted) {
           setBffStatus('offline');
+          setPaymentEnvironment('unknown');
         }
       }
     }
@@ -286,11 +295,35 @@ export function CustomerPaymentInfo({ profile }: Props) {
                 <i className="fi fi-rr-user-check" aria-hidden />
                 {hasPaymentSession ? 'Session siap' : authChecked ? 'Login ulang' : 'Cek session'}
               </span>
+              <span className={`status ${paymentEnvironment === 'production' ? 'done' : 'pending'}`}>
+                <i className="fi fi-rr-shield-check" aria-hidden />
+                {paymentEnvironment === 'production'
+                  ? 'Midtrans production'
+                  : paymentEnvironment === 'sandbox'
+                    ? 'Midtrans sandbox'
+                    : 'Mode dicek'}
+              </span>
             </div>
           </div>
           <span className="status pending">{unpaidOrders.length} belum lunas</span>
         </div>
       </section>
+
+      {paymentEnvironment === 'sandbox' ? (
+        <section className="alert info payment-sandbox-note">
+          <div>
+            <strong>QRIS sandbox tidak bisa discan pakai GoPay asli.</strong>
+            <span>
+              Untuk testing, buka QRIS Simulator Midtrans lalu masukkan URL gambar QR dari halaman Snap. QR real baru
+              valid setelah memakai production key dan mode production.
+            </span>
+          </div>
+          <a className="button secondary" href={qrisSandboxSimulatorUrl} rel="noreferrer" target="_blank">
+            <i className="fi fi-rr-link-alt" aria-hidden />
+            Buka Simulator
+          </a>
+        </section>
+      ) : null}
 
       <section className="app-card">
         <div className="page-header">
@@ -349,7 +382,9 @@ export function CustomerPaymentInfo({ profile }: Props) {
         <p className="eyebrow">Cara bayar</p>
         {[
           'Tekan Bayar Sekarang pada tagihan yang dipilih.',
-          'Selesaikan pembayaran di halaman Midtrans.',
+          paymentEnvironment === 'sandbox'
+            ? 'Untuk QRIS sandbox, gunakan QRIS Simulator Midtrans, bukan aplikasi GoPay asli.'
+            : 'Selesaikan pembayaran di halaman Midtrans.',
           'Webhook Midtrans mengubah status pembayaran menjadi PAID atau FAILED.',
           'Halaman ini menerima update realtime tanpa refresh.',
         ].map((item, index) => (

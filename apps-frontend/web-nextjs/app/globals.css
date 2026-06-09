@@ -849,6 +849,12 @@ h3 {
   color: var(--success);
 }
 
+.alert.info {
+  background: var(--lavender-100);
+  border: 1px solid var(--line);
+  color: var(--plum-900);
+}
+
 @keyframes icon-pop {
   0% {
     transform: scale(1);
@@ -2527,6 +2533,23 @@ h3 {
   gap: 6px;
 }
 
+.payment-sandbox-note {
+  align-items: center;
+  display: flex;
+  gap: 14px;
+  justify-content: space-between;
+}
+
+.payment-sandbox-note > div {
+  display: grid;
+  gap: 4px;
+}
+
+.payment-sandbox-note span {
+  color: var(--muted);
+  font-weight: 750;
+}
+
 .instructions-panel {
   display: grid;
   gap: 12px;
@@ -3685,6 +3708,7 @@ h3 {
 .device-android .page-header,
 .device-android .dashboard-hero,
 .device-android .location-strip,
+.device-android .payment-sandbox-note,
 .device-android .ticket-actions,
 .device-android .ticket-edit {
   align-items: stretch;

@@ -327,7 +327,11 @@ async function markLaundryOrderFailed(payload) {
 }
 
 app.get('/health', (_req, res) => {
-  res.json({ ok: true, service: 'scalewash-bff-service' });
+  res.json({
+    midtrans_environment: midtransIsProduction ? 'production' : 'sandbox',
+    ok: true,
+    service: 'scalewash-bff-service',
+  });
 });
 
 app.post('/api/v1/payment/create-laundry-order-transaction', async (req, res) => {
