@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { Suspense } from 'react';
 import { AppShell } from '@/components/AppShell';
 import '@flaticon/flaticon-uicons/css/regular/rounded.css';
 import '@flaticon/flaticon-uicons/css/solid/rounded.css';
@@ -13,7 +14,9 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   return (
     <html lang="id">
       <body>
-        <AppShell>{children}</AppShell>
+        <Suspense fallback={null}>
+          <AppShell>{children}</AppShell>
+        </Suspense>
       </body>
     </html>
   );

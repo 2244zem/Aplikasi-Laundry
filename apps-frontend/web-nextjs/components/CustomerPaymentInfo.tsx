@@ -68,6 +68,7 @@ function PaymentCard({ method }: { method: (typeof paymentMethods)[number] }) {
 export function CustomerPaymentInfo({ profile }: Props) {
   const [orders, setOrders] = useState<LaundryOrder[]>([]);
   const [loading, setLoading] = useState(true);
+  const [payingOrderId, setPayingOrderId] = useState('');
   const [message, setMessage] = useState('');
 
   const unpaidOrders = useMemo(
@@ -75,7 +76,7 @@ export function CustomerPaymentInfo({ profile }: Props) {
     [orders],
   );
   const unpaidTotal = useMemo(
-    () => unpaidOrders.reduce((sum, order) => sum + Number(order.total_harga || 0), 0),
+    () => unpaidOrders.reduce((sum, order) => sum + Number(order.total_harga || order.format_detail?.estimasi_harga || 0), 0),
     [unpaidOrders],
   );
 
@@ -134,6 +135,41 @@ export function CustomerPaymentInfo({ profile }: Props) {
     };
   }, [profile.id]);
 
+  async function payWithMidtrans(order: LaundryOrder) {
+    const bffBaseUrl = process.env.NEXT_PUBLIC_BFF_BASE_URL;
+
+    if (!bffBaseUrl) {
+      setMessage('NEXT_PUBLIC_BFF_BASE_URL belum diisi. Gunakan transfer manual lalu upload bukti di chat.');
+      return;
+    }
+
+    setPayingOrderId(order.id);
+    setMessage('');
+
+    try {
+      const response = await fetch(`${bffBaseUrl}/api/v1/payment/create-laundry-order-transaction`, {
+        body: JSON.stringify({ orderId: order.id }),
+        headers: { 'Content-Type': 'application/json' },
+        method: 'POST',
+      });
+      const payload = await response.json();
+
+      if (!response.ok || !payload.ok) {
+        throw new Error(typeof payload.error === 'string' ? payload.error : 'Gagal membuat transaksi Midtrans.');
+      }
+
+      window.location.href = payload.redirect_url;
+    } catch (error) {
+      setMessage(
+        error instanceof Error
+          ? `${error.message} Transfer manual tetap bisa dipakai.`
+          : 'Gagal membuka Midtrans. Transfer manual tetap bisa dipakai.',
+      );
+    } finally {
+      setPayingOrderId('');
+    }
+  }
+
   return (
     <div className="payment-screen">
       <section className="panel soft">
@@ -184,7 +220,11 @@ export function CustomerPaymentInfo({ profile }: Props) {
                 <strong>#{order.id.slice(0, 8)}</strong>
                 <span>{order.format_detail?.paket || 'Laundry order'} - {order.format_detail?.outlet_name || 'Outlet'}</span>
               </div>
-              <strong>{formatCurrency(Number(order.total_harga || 0))}</strong>
+              <strong>{formatCurrency(Number(order.total_harga || order.format_detail?.estimasi_harga || 0))}</strong>
+              <button className="button primary" disabled={payingOrderId === order.id} onClick={() => payWithMidtrans(order)} type="button">
+                <i className="fi fi-rr-credit-card" aria-hidden />
+                {payingOrderId === order.id ? 'Membuka...' : 'Bayar Sekarang'}
+              </button>
               <Link className="button secondary" href={`/orders/${order.id}/chat`}>
                 <i className="fi fi-rr-upload" aria-hidden />
                 Upload Bukti

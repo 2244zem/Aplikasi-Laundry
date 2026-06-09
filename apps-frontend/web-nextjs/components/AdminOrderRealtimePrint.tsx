@@ -2,6 +2,7 @@
 
 import type { CSSProperties } from 'react';
 import { useEffect, useState } from 'react';
+import { AdminServicePricingPanel } from '@/components/AdminServicePricingPanel';
 import { InteractiveChatLaundry } from '@/components/InteractiveChatLaundry';
 import { supabase } from '@/lib/supabaseClient';
 import type { LaundryOrder, UserProfile } from '@/lib/types';
@@ -310,6 +311,10 @@ function AdminOutletStudio({ profile }: Props) {
   );
   const [flyerAccent, setFlyerAccent] = useState(profile.flyer_accent || '#20bdd6');
   const [flyerDiscount, setFlyerDiscount] = useState(profile.flyer_discount_label || 'Diskon 20%');
+  const [outletIsOpen, setOutletIsOpen] = useState(profile.outlet_is_open ?? true);
+  const [pickupEta, setPickupEta] = useState(profile.outlet_pickup_eta_minutes?.toString() || '30');
+  const [outletRating, setOutletRating] = useState(profile.outlet_rating?.toString() || '4.8');
+  const [outletRadius, setOutletRadius] = useState(profile.outlet_radius_km?.toString() || '8');
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
 
@@ -347,6 +352,10 @@ function AdminOutletStudio({ profile }: Props) {
         flyer_body: flyerBody,
         flyer_accent: flyerAccent,
         flyer_discount_label: flyerDiscount,
+        outlet_is_open: outletIsOpen,
+        outlet_pickup_eta_minutes: Number(pickupEta || 30),
+        outlet_rating: Number(outletRating || 4.8),
+        outlet_radius_km: Number(outletRadius || 8),
       })
       .eq('id', profile.id);
 
@@ -367,6 +376,14 @@ function AdminOutletStudio({ profile }: Props) {
         <h2>{namaToko}</h2>
         <p>{alamatToko || 'Isi alamat outlet supaya customer lebih percaya dan lokasi bisa dihitung.'}</p>
         <div className="membership-meta">
+          <span>
+            <i className="fi fi-rr-store-alt" aria-hidden />
+            {outletIsOpen ? 'Buka' : 'Tutup'}
+          </span>
+          <span>
+            <i className="fi fi-rr-clock-three" aria-hidden />
+            ETA {pickupEta} menit
+          </span>
           <span>
             <i className="fi fi-rr-crown" aria-hidden />
             {profile.role}
@@ -416,6 +433,10 @@ function AdminOutletStudio({ profile }: Props) {
               <i className="fi fi-rr-location-crosshairs" aria-hidden />
               Pakai lokasi device
             </button>
+            <label className="switch-field">
+              <input checked={outletIsOpen} onChange={(event) => setOutletIsOpen(event.target.checked)} type="checkbox" />
+              <span>Outlet sedang buka</span>
+            </label>
           </div>
 
           <div className="form-grid">
@@ -435,6 +456,20 @@ function AdminOutletStudio({ profile }: Props) {
               <label className="field">
                 <span>Warna</span>
                 <input className="input color-input" onChange={(event) => setFlyerAccent(event.target.value)} type="color" value={flyerAccent} />
+              </label>
+            </div>
+            <div className="grid three compact-grid">
+              <label className="field">
+                <span>ETA pickup</span>
+                <input className="input" min={5} onChange={(event) => setPickupEta(event.target.value)} type="number" value={pickupEta} />
+              </label>
+              <label className="field">
+                <span>Rating</span>
+                <input className="input" max={5} min={0} onChange={(event) => setOutletRating(event.target.value)} step="0.1" type="number" value={outletRating} />
+              </label>
+              <label className="field">
+                <span>Radius km</span>
+                <input className="input" min={1} onChange={(event) => setOutletRadius(event.target.value)} step="0.5" type="number" value={outletRadius} />
               </label>
             </div>
           </div>
@@ -566,6 +601,7 @@ export function AdminOrderRealtimePrint({ profile }: Props) {
   return (
     <div className="grid admin-dashboard">
       <AdminOutletStudio profile={profile} />
+      <AdminServicePricingPanel profile={profile} />
 
       <section className="ops-hero">
         <div className="page-header">
@@ -589,7 +625,7 @@ export function AdminOrderRealtimePrint({ profile }: Props) {
         </div>
       </section>
 
-      <section className="app-card">
+      <section className="app-card" id="orders">
         <div className="page-header">
           <div>
             <p className="eyebrow">Antrian order</p>

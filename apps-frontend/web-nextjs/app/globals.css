@@ -255,6 +255,21 @@ a {
   border-color: #cde3ff;
 }
 
+.language-toggle {
+  align-items: center;
+  background: #ffffff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--plum-900);
+  cursor: pointer;
+  display: inline-flex;
+  font-size: 13px;
+  font-weight: 950;
+  gap: 7px;
+  min-height: 40px;
+  padding: 8px 11px;
+}
+
 .mobile-tabbar {
   display: none;
 }
@@ -327,6 +342,14 @@ h3 {
 
 .grid.two {
   grid-template-columns: minmax(0, 1fr) minmax(320px, 0.55fr);
+}
+
+.grid.three {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.grid.four {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
 .panel {
@@ -1339,6 +1362,35 @@ body {
 .outlet-card.active {
   border-color: #8fc9fb;
   box-shadow: inset 0 0 0 1px #8fc9fb;
+}
+
+.outlet-card.disabled {
+  opacity: 0.62;
+}
+
+.radius-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.radius-filter button {
+  background: #ffffff;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 900;
+  min-height: 34px;
+  padding: 7px 12px;
+}
+
+.radius-filter button.active,
+.radius-filter button:hover {
+  background: var(--lavender-200);
+  border-color: #c7b8e8;
+  color: var(--plum-900);
 }
 
 .order-side {
@@ -2482,15 +2534,204 @@ h3 {
   color: var(--warning);
 }
 
+.user-dashboard-screen,
+.admin-chat-inbox {
+  display: grid;
+  gap: 16px;
+}
+
+.dashboard-hero {
+  align-items: center;
+  display: flex;
+  gap: 18px;
+  justify-content: space-between;
+}
+
+.dashboard-hero h1 {
+  max-width: 720px;
+}
+
+.dashboard-metrics {
+  gap: 14px;
+}
+
+.dashboard-main-card,
+.dashboard-order-focus {
+  display: grid;
+  gap: 14px;
+}
+
+.pricing-panel,
+.pricing-form,
+.pricing-list {
+  display: grid;
+  gap: 14px;
+}
+
+.pricing-grid {
+  align-items: start;
+}
+
+.pricing-card {
+  align-items: center;
+  background: #fffdf8;
+  border: 1px solid rgba(222, 215, 239, 0.96);
+  border-radius: 8px;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: 1fr auto auto;
+  padding: 13px;
+}
+
+.pricing-card.inactive {
+  opacity: 0.56;
+}
+
+.pricing-card strong,
+.pricing-card small {
+  display: block;
+}
+
+.pricing-card small {
+  color: var(--muted);
+  font-weight: 750;
+  margin-top: 3px;
+}
+
+.pricing-price {
+  display: grid;
+  justify-items: end;
+  min-width: 130px;
+}
+
+.pricing-price strong {
+  color: var(--plum-950);
+}
+
+.pricing-price span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.switch-field {
+  align-items: center;
+  background: var(--lavender-100);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink);
+  display: flex;
+  font-weight: 850;
+  gap: 10px;
+  padding: 11px 12px;
+}
+
+.switch-field input {
+  accent-color: var(--plum-800);
+  height: 18px;
+  width: 18px;
+}
+
+.compact-grid {
+  gap: 10px;
+}
+
+.admin-chat-layout {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: minmax(280px, 0.36fr) minmax(0, 1fr);
+}
+
+.chat-inbox-list,
+.chat-conversation-list,
+.chat-inbox-detail {
+  display: grid;
+  gap: 12px;
+  align-content: start;
+}
+
+.chat-filter {
+  width: 100%;
+}
+
+.conversation-card {
+  align-items: center;
+  background: #fffdf8;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink);
+  cursor: pointer;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: auto 1fr auto;
+  padding: 12px;
+  text-align: left;
+}
+
+.conversation-card.active,
+.conversation-card:hover {
+  background: var(--lavender-100);
+  border-color: #c7b8e8;
+}
+
+.conversation-avatar {
+  background: var(--lavender-200);
+  border-radius: 8px;
+  color: var(--plum-800);
+  display: grid;
+  height: 42px;
+  place-items: center;
+  width: 42px;
+}
+
+.conversation-card strong,
+.conversation-card small {
+  display: block;
+}
+
+.conversation-card small {
+  color: var(--muted);
+  font-weight: 750;
+  line-height: 1.35;
+  margin-top: 3px;
+}
+
+.conversation-card em {
+  background: #fff0f3;
+  border-radius: 999px;
+  color: var(--danger);
+  display: grid;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 950;
+  height: 24px;
+  place-items: center;
+  width: 24px;
+}
+
+.quick-status-panel {
+  align-items: center;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(0, 0.45fr) 1fr;
+}
+
+.bill-card {
+  grid-template-columns: 1fr auto auto auto;
+}
+
 @media (max-width: 760px) {
   .history-detail-grid,
   .bill-card,
-  .inventory-card {
+  .inventory-card,
+  .pricing-card,
+  .quick-status-panel {
     grid-template-columns: 1fr;
   }
 
   .bill-card,
-  .inventory-stock {
+  .inventory-stock,
+  .pricing-price {
     justify-items: start;
   }
 
@@ -2500,5 +2741,14 @@ h3 {
 
   .segmented-control button {
     flex: 1;
+  }
+
+  .dashboard-hero {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .admin-chat-layout {
+    grid-template-columns: 1fr;
   }
 }

@@ -1,9 +1,10 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import type { Session, User } from '@supabase/supabase-js';
+import type { Session } from '@supabase/supabase-js';
 import { LogIn, LogOut, UserPlus } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
+import { ensureProfile } from '@/lib/profile';
 import type { UserProfile } from '@/lib/types';
 
 type AuthState = {
@@ -23,44 +24,6 @@ type AuthenticatedState = {
 type AuthPanelProps = {
   children: (state: AuthenticatedState & { refreshProfile: () => Promise<void> }) => React.ReactNode;
 };
-
-async function fetchProfile(user: User) {
-  const { data, error } = await supabase
-    .from('tabel_user')
-    .select('*')
-    .eq('auth_user_id', user.id)
-    .maybeSingle();
-
-  if (error) {
-    throw error;
-  }
-
-  return data as UserProfile | null;
-}
-
-async function ensureProfile(user: User, fallbackName?: string) {
-  const existing = await fetchProfile(user);
-
-  if (existing) {
-    return existing;
-  }
-
-  const { data, error } = await supabase
-    .from('tabel_user')
-    .insert({
-      auth_user_id: user.id,
-      nama: fallbackName || user.email?.split('@')[0] || 'Ungu Laundry User',
-      email: user.email,
-    })
-    .select('*')
-    .single();
-
-  if (error) {
-    throw error;
-  }
-
-  return data as UserProfile;
-}
 
 export function AuthPanel({ children }: AuthPanelProps) {
   const [session, setSession] = useState<Session | null>(null);

@@ -40,6 +40,17 @@ export function InteractiveChatLaundry({ orderId, profile }: Props) {
   const logRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
+    async function markIncomingMessagesRead() {
+      const column = profile.role === 'USER' ? 'read_by_user_at' : 'read_by_admin_at';
+
+      await supabase
+        .from('tabel_chat_message')
+        .update({ [column]: new Date().toISOString() })
+        .eq('order_id', orderId)
+        .neq('sender_user_id', profile.id)
+        .is(column, null);
+    }
+
     async function fetchOrder() {
       const { data, error } = await supabase.from('tabel_order').select('*').eq('id', orderId).maybeSingle();
 
@@ -68,6 +79,7 @@ export function InteractiveChatLaundry({ orderId, profile }: Props) {
 
     void fetchOrder();
     void fetchChatHistory();
+    void markIncomingMessagesRead();
 
     const chatRoom = supabase
       .channel(`scale-wash:order-chat:${orderId}`)
@@ -88,6 +100,11 @@ export function InteractiveChatLaundry({ orderId, profile }: Props) {
 
             return [...currentMessages, nextMessage];
           });
+
+          const nextMessage = payload.new as ChatMessage;
+          if (nextMessage.sender_user_id !== profile.id) {
+            void markIncomingMessagesRead();
+          }
         },
       )
       .subscribe();
@@ -112,7 +129,7 @@ export function InteractiveChatLaundry({ orderId, profile }: Props) {
       void supabase.removeChannel(chatRoom);
       void supabase.removeChannel(orderRoom);
     };
-  }, [orderId]);
+  }, [orderId, profile.id, profile.role]);
 
   useEffect(() => {
     logRef.current?.scrollTo({ top: logRef.current.scrollHeight, behavior: 'smooth' });
@@ -184,6 +201,7 @@ export function InteractiveChatLaundry({ orderId, profile }: Props) {
       const { error } = await supabase.from('tabel_chat_message').insert({
         order_id: orderId,
         sender_user_id: profile.id,
+        receiver_user_id: order?.user_id === profile.id ? order?.admin_outlet_id ?? null : order?.user_id ?? null,
         message: textInput.trim(),
         attachment_url: attachmentUrl,
         attachment_path: attachmentPath,

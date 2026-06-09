@@ -14,10 +14,19 @@ export type UserProfile = {
   flyer_body: string | null;
   flyer_accent: string | null;
   flyer_discount_label: string | null;
+  outlet_is_open: boolean;
+  outlet_pickup_eta_minutes: number;
+  outlet_rating: number;
+  outlet_radius_km: number;
 };
 
 export type LaundryOrderDetail = {
   paket?: string;
+  service_id?: string;
+  satuan?: 'kg' | 'pcs' | 'item';
+  harga_satuan?: number;
+  estimasi_harga?: number;
+  estimasi_menit?: number;
   alamat?: string;
   estimasi_pakaian?: number;
   catatan?: string;
@@ -57,6 +66,8 @@ export type ChatMessage = {
   attachment_url: string | null;
   attachment_path: string | null;
   attachment_mime_type: string | null;
+  read_by_admin_at: string | null;
+  read_by_user_at: string | null;
   created_at: string;
 };
 
@@ -98,6 +109,20 @@ export type InventoryItem = {
   satuan: string;
   stok_minimum: number;
   catatan: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ServicePricing = {
+  id: string;
+  admin_id: string;
+  nama_layanan: string;
+  deskripsi: string | null;
+  satuan: 'kg' | 'pcs' | 'item';
+  harga: number;
+  estimasi_menit: number;
+  aktif: boolean;
+  urutan: number;
   created_at: string;
   updated_at: string;
 };

@@ -4,7 +4,7 @@ import type { CSSProperties } from 'react';
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
-import type { LaundryOrder, UserProfile } from '@/lib/types';
+import type { LaundryOrder, ServicePricing, UserProfile } from '@/lib/types';
 
 type Props = {
   profile: UserProfile;
@@ -26,6 +26,10 @@ type OutletProfile = Pick<
   | 'flyer_body'
   | 'flyer_accent'
   | 'flyer_discount_label'
+  | 'outlet_is_open'
+  | 'outlet_pickup_eta_minutes'
+  | 'outlet_rating'
+  | 'outlet_radius_km'
 >;
 
 type UserLocation = {
@@ -33,11 +37,15 @@ type UserLocation = {
   longitude: number;
 };
 
-const serviceOptions = [
-  { icon: 'fi-rr-washer', label: 'Cuci Setrika', min: 'Mulai 12 pcs' },
-  { icon: 'fi-rr-water', label: 'Cuci Kering', min: 'Reguler' },
-  { icon: 'fi-rr-iron', label: 'Setrika Saja', min: 'Rapi lipat' },
-  { icon: 'fi-rr-bolt', label: 'Express 6 Jam', min: 'Prioritas' },
+type ServiceChoice = Pick<ServicePricing, 'aktif' | 'deskripsi' | 'estimasi_menit' | 'harga' | 'id' | 'nama_layanan' | 'satuan'> & {
+  icon: string;
+};
+
+const fallbackServicePrices: ServiceChoice[] = [
+  { aktif: true, deskripsi: 'Cuci, kering, dan setrika rapi', estimasi_menit: 1440, harga: 8000, icon: 'fi-rr-washer', id: 'fallback-cuci-setrika', nama_layanan: 'Cuci Setrika', satuan: 'kg' },
+  { aktif: true, deskripsi: 'Cuci dan lipat reguler', estimasi_menit: 1440, harga: 6000, icon: 'fi-rr-water', id: 'fallback-cuci-kering', nama_layanan: 'Cuci Kering', satuan: 'kg' },
+  { aktif: true, deskripsi: 'Setrika rapi untuk pakaian bersih', estimasi_menit: 720, harga: 5000, icon: 'fi-rr-iron', id: 'fallback-setrika', nama_layanan: 'Setrika Saja', satuan: 'kg' },
+  { aktif: true, deskripsi: 'Prioritas selesai di hari yang sama', estimasi_menit: 360, harga: 15000, icon: 'fi-rr-bolt', id: 'fallback-express', nama_layanan: 'Express 6 Jam', satuan: 'kg' },
 ];
 
 const orderSteps: LaundryOrder['status_order'][] = ['PENDING_CONFIRMATION', 'DITERIMA', 'DICUCI', 'DISETRIKA', 'SELESAI'];
@@ -60,6 +68,41 @@ function isActiveOutlet(outlet: OutletProfile) {
 
 function outletName(outlet: OutletProfile) {
   return outlet.nama_toko || `Laundry ${outlet.nama}`;
+}
+
+function formatCurrency(value: number) {
+  return new Intl.NumberFormat('id-ID', {
+    currency: 'IDR',
+    maximumFractionDigits: 0,
+    style: 'currency',
+  }).format(value || 0);
+}
+
+function formatEta(minutes: number) {
+  if (minutes < 60) {
+    return `${minutes} menit`;
+  }
+
+  const hours = Math.round(minutes / 60);
+  return hours < 24 ? `${hours} jam` : `${Math.round(hours / 24)} hari`;
+}
+
+function serviceIcon(serviceName: string) {
+  const normalized = serviceName.toLowerCase();
+
+  if (normalized.includes('express')) {
+    return 'fi-rr-bolt';
+  }
+
+  if (normalized.includes('setrika')) {
+    return 'fi-rr-iron';
+  }
+
+  if (normalized.includes('kering')) {
+    return 'fi-rr-water';
+  }
+
+  return 'fi-rr-washer';
 }
 
 function distanceKm(from: UserLocation | null, outlet: OutletProfile) {
@@ -94,17 +137,20 @@ function upsertOrderList(currentOrders: LaundryOrder[], nextOrder: LaundryOrder)
 }
 
 export function CustomerOrderForm({ profile }: Props) {
-  const [paket, setPaket] = useState('Cuci Setrika');
+  const [selectedServiceId, setSelectedServiceId] = useState(fallbackServicePrices[0].id);
   const [estimasiPakaian, setEstimasiPakaian] = useState(12);
   const [alamat, setAlamat] = useState('');
   const [pickupTime, setPickupTime] = useState('');
   const [catatan, setCatatan] = useState('');
   const [outlets, setOutlets] = useState<OutletProfile[]>([]);
+  const [servicePrices, setServicePrices] = useState<ServiceChoice[]>(fallbackServicePrices);
   const [selectedOutletId, setSelectedOutletId] = useState('');
+  const [radiusFilterKm, setRadiusFilterKm] = useState(10);
   const [location, setLocation] = useState<UserLocation | null>(null);
   const [locationMessage, setLocationMessage] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [loadingOutlets, setLoadingOutlets] = useState(true);
+  const [loadingPrices, setLoadingPrices] = useState(false);
   const [ordersLoading, setOrdersLoading] = useState(true);
   const [activeOrders, setActiveOrders] = useState<LaundryOrder[]>([]);
   const [message, setMessage] = useState('');
@@ -114,9 +160,22 @@ export function CustomerOrderForm({ profile }: Props) {
     () => outlets.find((outlet) => outlet.id === selectedOutletId) ?? null,
     [outlets, selectedOutletId],
   );
+  const selectedService = useMemo(
+    () => servicePrices.find((service) => service.id === selectedServiceId) ?? servicePrices[0],
+    [selectedServiceId, servicePrices],
+  );
+  const estimatedPrice = useMemo(
+    () => Math.max(0, estimasiPakaian) * Number(selectedService?.harga || 0),
+    [estimasiPakaian, selectedService?.harga],
+  );
 
   const sortedOutlets = useMemo(() => {
-    return [...outlets].sort((left, right) => {
+    return [...outlets]
+      .filter((outlet) => {
+        const range = distanceKm(location, outlet);
+        return !location || range == null || range <= radiusFilterKm;
+      })
+      .sort((left, right) => {
       const leftDistance = distanceKm(location, left);
       const rightDistance = distanceKm(location, right);
 
@@ -134,7 +193,7 @@ export function CustomerOrderForm({ profile }: Props) {
 
       return leftDistance - rightDistance;
     });
-  }, [location, outlets]);
+  }, [location, outlets, radiusFilterKm]);
 
   useEffect(() => {
     let mounted = true;
@@ -145,7 +204,7 @@ export function CustomerOrderForm({ profile }: Props) {
       const { data, error } = await supabase
         .from('tabel_user')
         .select(
-          'id,nama,email,role,status_langganan,tgl_kadaluwarsa_langganan,nama_toko,alamat_toko,outlet_latitude,outlet_longitude,flyer_title,flyer_body,flyer_accent,flyer_discount_label',
+          'id,nama,email,role,status_langganan,tgl_kadaluwarsa_langganan,nama_toko,alamat_toko,outlet_latitude,outlet_longitude,flyer_title,flyer_body,flyer_accent,flyer_discount_label,outlet_is_open,outlet_pickup_eta_minutes,outlet_rating,outlet_radius_km',
         )
         .in('role', ['ADMIN', 'SUPERADMIN'])
         .order('nama', { ascending: true });
@@ -172,6 +231,55 @@ export function CustomerOrderForm({ profile }: Props) {
       mounted = false;
     };
   }, []);
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function loadServicePrices() {
+      if (!selectedOutletId) {
+        setServicePrices(fallbackServicePrices);
+        setSelectedServiceId(fallbackServicePrices[0].id);
+        return;
+      }
+
+      setLoadingPrices(true);
+
+      const { data, error } = await supabase
+        .from('tabel_service_pricing')
+        .select('*')
+        .eq('admin_id', selectedOutletId)
+        .eq('aktif', true)
+        .order('urutan', { ascending: true })
+        .order('created_at', { ascending: true });
+
+      if (!mounted) {
+        return;
+      }
+
+      setLoadingPrices(false);
+
+      if (error) {
+        setMessage(error.message);
+        setServicePrices(fallbackServicePrices);
+        setSelectedServiceId(fallbackServicePrices[0].id);
+        return;
+      }
+
+      const mappedPrices = ((data ?? []) as ServicePricing[]).map((price) => ({
+        ...price,
+        icon: serviceIcon(price.nama_layanan),
+      }));
+      const nextPrices = mappedPrices.length > 0 ? mappedPrices : fallbackServicePrices;
+      setServicePrices(nextPrices);
+      setSelectedServiceId(nextPrices[0].id);
+    }
+
+    void loadServicePrices();
+
+    return () => {
+      mounted = false;
+    };
+  }, [selectedOutletId]);
 
   useEffect(() => {
     let mounted = true;
@@ -266,6 +374,22 @@ export function CustomerOrderForm({ profile }: Props) {
       return;
     }
 
+    if (!selectedOutlet.outlet_is_open) {
+      setMessage(`${outletName(selectedOutlet)} sedang tutup. Pilih outlet lain yang sedang buka.`);
+      return;
+    }
+
+    const selectedRange = distanceKm(location, selectedOutlet);
+    if (location && selectedRange != null && selectedRange > Number(selectedOutlet.outlet_radius_km || radiusFilterKm)) {
+      setMessage(`${outletName(selectedOutlet)} berada di luar radius layanan outlet.`);
+      return;
+    }
+
+    if (!selectedService) {
+      setMessage('Pilih layanan laundry dulu sebelum kirim order.');
+      return;
+    }
+
     setSubmitting(true);
     setMessage('');
     setCreatedOrderId('');
@@ -276,7 +400,12 @@ export function CustomerOrderForm({ profile }: Props) {
         user_id: profile.id,
         admin_outlet_id: selectedOutlet.id,
         format_detail: {
-          paket,
+          paket: selectedService.nama_layanan,
+          service_id: selectedService.id.startsWith('fallback-') ? undefined : selectedService.id,
+          satuan: selectedService.satuan,
+          harga_satuan: selectedService.harga,
+          estimasi_harga: estimatedPrice,
+          estimasi_menit: selectedService.estimasi_menit,
           estimasi_pakaian: estimasiPakaian,
           alamat,
           pickup_time: pickupTime,
@@ -286,6 +415,7 @@ export function CustomerOrderForm({ profile }: Props) {
           outlet_name: outletName(selectedOutlet),
           outlet_address: selectedOutlet.alamat_toko,
         },
+        total_harga: estimatedPrice,
         status_order: 'PENDING_CONFIRMATION',
         status_pembayaran: 'UNPAID',
       })
@@ -324,19 +454,20 @@ export function CustomerOrderForm({ profile }: Props) {
 
         <form className="form-grid" onSubmit={handleSubmit}>
           <div className="service-picker" aria-label="Pilih paket laundry">
-            {serviceOptions.map((service) => (
+            {servicePrices.map((service) => (
               <button
-                className={`service-option ${paket === service.label ? 'active' : ''}`}
-                key={service.label}
-                onClick={() => setPaket(service.label)}
+                className={`service-option ${selectedServiceId === service.id ? 'active' : ''}`}
+                key={service.id}
+                onClick={() => setSelectedServiceId(service.id)}
                 type="button"
               >
                 <i className={`fi ${service.icon}`} aria-hidden />
-                <strong>{service.label}</strong>
-                <span>{service.min}</span>
+                <strong>{service.nama_layanan}</strong>
+                <span>{formatCurrency(Number(service.harga))}/{service.satuan} - {formatEta(Number(service.estimasi_menit))}</span>
               </button>
             ))}
           </div>
+          {loadingPrices ? <p className="form-note">Memuat harga layanan outlet...</p> : null}
 
           <div className="location-strip">
             <div>
@@ -351,6 +482,19 @@ export function CustomerOrderForm({ profile }: Props) {
             </button>
           </div>
           {locationMessage ? <p className="form-note">{locationMessage}</p> : null}
+
+          <div className="radius-filter" aria-label="Filter radius laundry">
+            {[3, 5, 10, 20].map((radius) => (
+              <button
+                className={radiusFilterKm === radius ? 'active' : ''}
+                key={radius}
+                onClick={() => setRadiusFilterKm(radius)}
+                type="button"
+              >
+                {radius} km
+              </button>
+            ))}
+          </div>
 
           <div className="field">
             <span>Laundry terdekat</span>
@@ -367,10 +511,11 @@ export function CustomerOrderForm({ profile }: Props) {
               {sortedOutlets.map((outlet) => {
                 const range = distanceKm(location, outlet);
                 const isSelected = selectedOutletId === outlet.id;
+                const isOpen = outlet.outlet_is_open;
 
                 return (
                   <button
-                    className={`outlet-card ${isSelected ? 'active' : ''}`}
+                    className={`outlet-card ${isSelected ? 'active' : ''} ${isOpen ? '' : 'disabled'}`}
                     key={outlet.id}
                     onClick={() => setSelectedOutletId(outlet.id)}
                     type="button"
@@ -381,7 +526,13 @@ export function CustomerOrderForm({ profile }: Props) {
                     <span>
                       <strong>{outletName(outlet)}</strong>
                       <small>{outlet.alamat_toko || outlet.email}</small>
-                      <em>{range == null ? 'Lokasi outlet belum diset' : `${range.toFixed(1)} km dari kamu`}</em>
+                      <em>
+                        {range == null ? 'Lokasi belum diset' : `${range.toFixed(1)} km`}
+                        {' - '}
+                        {isOpen ? `Buka - ETA ${outlet.outlet_pickup_eta_minutes || 30} menit` : 'Tutup'}
+                        {' - '}
+                        {Number(outlet.outlet_rating || 4.8).toFixed(1)} rating
+                      </em>
                     </span>
                     <i className={`fi ${isSelected ? 'fi-sr-badge-check' : 'fi-rr-angle-small-right'}`} aria-hidden />
                   </button>
@@ -484,8 +635,9 @@ export function CustomerOrderForm({ profile }: Props) {
             <p>UNGU LAUNDRY ORDER</p>
             <p>User: {profile.nama}</p>
             <p>Outlet: {selectedOutlet ? outletName(selectedOutlet) : '-'}</p>
-            <p>Paket: {paket}</p>
-            <p>Estimasi: {estimasiPakaian} pcs</p>
+            <p>Paket: {selectedService?.nama_layanan || '-'}</p>
+            <p>Estimasi: {estimasiPakaian} {selectedService?.satuan || 'pcs'}</p>
+            <p>Harga: {formatCurrency(estimatedPrice)}</p>
             <p>Status: PENDING_CONFIRMATION</p>
           </div>
         </div>
