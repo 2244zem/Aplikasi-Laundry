@@ -130,7 +130,7 @@ export function AdminChatInbox({ profile }: Props) {
     return () => {
       void supabase.removeChannel(chatChannel);
     };
-  }, [isActiveAdmin, profile.id]);
+  }, [isActiveAdmin, outletId, profile.id]);
 
   const conversations = useMemo(() => {
     return orders

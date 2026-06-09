@@ -1,6 +1,5 @@
 'use client';
 
-import type { CSSProperties } from 'react';
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { ListSkeleton } from '@/components/Skeleton';
@@ -11,59 +10,12 @@ type Props = {
   profile: UserProfile;
 };
 
-const paymentMethods = [
-  {
-    account: '083823223372',
-    accent: '#6f49d8',
-    bank: 'DANA',
-    holder: 'Ungu Laundry',
-    id: 'dana',
-  },
-  {
-    account: '4373160311',
-    accent: '#1a0f3c',
-    bank: 'BCA',
-    holder: 'Ungu Laundry',
-    id: 'bca',
-  },
-];
-
 function formatCurrency(value: number) {
   return new Intl.NumberFormat('id-ID', {
     currency: 'IDR',
     maximumFractionDigits: 0,
     style: 'currency',
   }).format(Number(value || 0));
-}
-
-function PaymentCard({ method }: { method: (typeof paymentMethods)[number] }) {
-  const [copied, setCopied] = useState(false);
-
-  async function copyAccount() {
-    await navigator.clipboard.writeText(method.account);
-    setCopied(true);
-    window.setTimeout(() => setCopied(false), 1600);
-  }
-
-  return (
-    <article className="payment-card" style={{ '--payment-accent': method.accent } as CSSProperties}>
-      <div className="payment-card-head">
-        <span>
-          <i className="fi fi-rr-credit-card" aria-hidden />
-        </span>
-        <strong>{method.bank}</strong>
-      </div>
-      <small>Nomor rekening / wallet</small>
-      <p>{method.account}</p>
-      <div>
-        <span>Atas nama {method.holder}</span>
-        <button onClick={copyAccount} type="button">
-          <i className={`fi ${copied ? 'fi-sr-badge-check' : 'fi-rr-copy'}`} aria-hidden />
-          {copied ? 'Tersalin' : 'Salin'}
-        </button>
-      </div>
-    </article>
-  );
 }
 
 export function CustomerPaymentInfo({ profile }: Props) {
@@ -116,6 +68,19 @@ export function CustomerPaymentInfo({ profile }: Props) {
       .on(
         'postgres_changes',
         {
+          event: 'INSERT',
+          filter: `user_id=eq.${profile.id}`,
+          schema: 'public',
+          table: 'tabel_order',
+        },
+        (payload) => {
+          const nextOrder = payload.new as LaundryOrder;
+          setOrders((currentOrders) => [nextOrder, ...currentOrders].slice(0, 40));
+        },
+      )
+      .on(
+        'postgres_changes',
+        {
           event: 'UPDATE',
           filter: `user_id=eq.${profile.id}`,
           schema: 'public',
@@ -140,7 +105,16 @@ export function CustomerPaymentInfo({ profile }: Props) {
     const bffBaseUrl = process.env.NEXT_PUBLIC_BFF_BASE_URL;
 
     if (!bffBaseUrl) {
-      setMessage('NEXT_PUBLIC_BFF_BASE_URL belum diisi. Gunakan transfer manual lalu upload bukti di chat.');
+      setMessage('NEXT_PUBLIC_BFF_BASE_URL belum diisi. Hubungkan BFF agar tombol Midtrans bisa dipakai.');
+      return;
+    }
+
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    if (!session?.access_token) {
+      setMessage('Sesi login tidak ditemukan. Masuk ulang sebelum membayar.');
       return;
     }
 
@@ -150,7 +124,10 @@ export function CustomerPaymentInfo({ profile }: Props) {
     try {
       const response = await fetch(`${bffBaseUrl}/api/v1/payment/create-laundry-order-transaction`, {
         body: JSON.stringify({ orderId: order.id }),
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+        },
         method: 'POST',
       });
       const payload = await response.json();
@@ -163,8 +140,8 @@ export function CustomerPaymentInfo({ profile }: Props) {
     } catch (error) {
       setMessage(
         error instanceof Error
-          ? `${error.message} Transfer manual tetap bisa dipakai.`
-          : 'Gagal membuka Midtrans. Transfer manual tetap bisa dipakai.',
+          ? error.message
+          : 'Gagal membuka Midtrans. Coba lagi beberapa saat lagi.',
       );
     } finally {
       setPayingOrderId('');
@@ -177,17 +154,11 @@ export function CustomerPaymentInfo({ profile }: Props) {
         <div className="page-header">
           <div>
             <p className="eyebrow">Pembayaran</p>
-            <h1>Transfer cepat, konfirmasi lewat chat.</h1>
-            <p className="muted">Upload bukti transfer di chat order supaya admin bisa update status pembayaran.</p>
+            <h1>Bayar order lewat Midtrans.</h1>
+            <p className="muted">Klik Bayar Sekarang, selesaikan pembayaran, lalu status berubah realtime dari webhook.</p>
           </div>
           <span className="status pending">{unpaidOrders.length} belum lunas</span>
         </div>
-      </section>
-
-      <section className="grid two payment-grid">
-        {paymentMethods.map((method) => (
-          <PaymentCard key={method.id} method={method} />
-        ))}
       </section>
 
       <section className="app-card">
@@ -227,8 +198,8 @@ export function CustomerPaymentInfo({ profile }: Props) {
                 {payingOrderId === order.id ? 'Membuka...' : 'Bayar Sekarang'}
               </button>
               <Link className="button secondary" href={`/orders/${order.id}/chat`}>
-                <i className="fi fi-rr-upload" aria-hidden />
-                Upload Bukti
+                <i className="fi fi-rr-comment-alt" aria-hidden />
+                Chat Order
               </Link>
             </article>
           ))}
@@ -238,10 +209,10 @@ export function CustomerPaymentInfo({ profile }: Props) {
       <section className="panel instructions-panel">
         <p className="eyebrow">Cara bayar</p>
         {[
-          'Transfer sesuai total tagihan yang muncul pada order.',
-          'Tulis ID order pada catatan transfer jika tersedia.',
-          'Buka chat order, kirim foto bukti transfer, lalu tunggu admin memverifikasi.',
-          'Status pembayaran berubah realtime saat admin mengupdate dashboard.',
+          'Tekan Bayar Sekarang pada tagihan yang dipilih.',
+          'Selesaikan pembayaran di halaman Midtrans.',
+          'Webhook Midtrans mengubah status pembayaran menjadi PAID atau FAILED.',
+          'Halaman ini menerima update realtime tanpa refresh.',
         ].map((item, index) => (
           <div className="instruction-step" key={item}>
             <span>{index + 1}</span>

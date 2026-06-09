@@ -165,6 +165,7 @@ export function CustomerOrderForm({ profile }: Props) {
     () => servicePrices.find((service) => service.id === selectedServiceId) ?? servicePrices[0],
     [selectedServiceId, servicePrices],
   );
+  const estimateUnit = selectedService?.satuan || 'pcs';
   const estimatedPrice = useMemo(
     () => Math.max(0, estimasiPakaian) * Number(selectedService?.harga || 0),
     [estimasiPakaian, selectedService?.harga],
@@ -479,7 +480,7 @@ export function CustomerOrderForm({ profile }: Props) {
               <span className="motion-icon">
                 <i className="fi fi-rr-location-crosshairs" aria-hidden />
               </span>
-              Get location
+              Pakai lokasi
             </button>
           </div>
           {locationMessage ? <p className="form-note">{locationMessage}</p> : null}
@@ -543,12 +544,13 @@ export function CustomerOrderForm({ profile }: Props) {
           </div>
 
           <label className="field">
-            <span>Estimasi pakaian</span>
+            <span>Estimasi {estimateUnit === 'kg' ? 'berat' : 'jumlah'} ({estimateUnit})</span>
             <input
               className="input"
               min={1}
               onChange={(event) => setEstimasiPakaian(Number(event.target.value))}
               required
+              step={estimateUnit === 'kg' ? '0.1' : '1'}
               type="number"
               value={estimasiPakaian}
             />
@@ -613,7 +615,7 @@ export function CustomerOrderForm({ profile }: Props) {
 
       <aside className="order-side">
         <div className="ad-card" style={{ '--ad-accent': selectedOutlet?.flyer_accent || '#20bdd6' } as CSSProperties}>
-          <span className="ad-pill">{selectedOutlet?.flyer_discount_label || 'Member active'}</span>
+          <span className="ad-pill">{selectedOutlet?.flyer_discount_label || 'Member aktif'}</span>
           <h2>{selectedOutlet?.flyer_title || 'Laundry bersih, pickup cepat.'}</h2>
           <p>
             {selectedOutlet?.flyer_body ||
@@ -628,18 +630,18 @@ export function CustomerOrderForm({ profile }: Props) {
           <div className="section-heading compact">
             <div>
               <p className="eyebrow">Ringkasan</p>
-              <h2>Order preview</h2>
+              <h2>Preview order</h2>
             </div>
-            <span className="status pending">Draft</span>
+            <span className="status pending">Draf</span>
           </div>
           <div className="receipt-preview modern">
             <p>UNGU LAUNDRY ORDER</p>
             <p>User: {profile.nama}</p>
             <p>Outlet: {selectedOutlet ? outletName(selectedOutlet) : '-'}</p>
             <p>Paket: {selectedService?.nama_layanan || '-'}</p>
-            <p>Estimasi: {estimasiPakaian} {selectedService?.satuan || 'pcs'}</p>
+            <p>Estimasi: {estimasiPakaian} {estimateUnit}</p>
             <p>Harga: {formatCurrency(estimatedPrice)}</p>
-            <p>Status: PENDING_CONFIRMATION</p>
+            <p>Status: PENDING</p>
           </div>
         </div>
 

@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { ensureProfile } from '@/lib/profile';
 import { supabase } from '@/lib/supabaseClient';
@@ -62,17 +63,17 @@ const copy = {
 const workflowCards = {
   id: [
     { href: '/orders/new', icon: 'fi-rr-location-crosshairs', title: 'Cari outlet dekat user', body: 'User aktifkan lokasi, pilih laundry, lalu order masuk ke outlet itu.' },
-    { href: '/admin/dashboard', icon: 'fi-rr-megaphone', title: 'Flyer membership admin', body: 'Admin aktif bisa edit promo, warna, nama toko, dan lokasi outlet.' },
+    { href: '/admin/dashboard', icon: 'fi-rr-tags', title: 'Harga layanan outlet', body: 'Customer memilih layanan aktif dan preview harga otomatis mengikuti outlet.' },
     { href: '/orders/history', icon: 'fi-rr-ballot', title: 'Riwayat order user', body: 'Timeline order, tagihan, dan tombol chat mengikuti status realtime.' },
     { href: '/admin/chat', icon: 'fi-rr-comment-alt', title: 'Inbox chat admin', body: 'Admin melihat pesan masuk, unread badge, dan quick reply status.' },
-    { href: '/admin/inventory', icon: 'fi-rr-box-open', title: 'Stok operasional', body: 'Inventory admin untuk detergen, parfum, plastik, dan item outlet lainnya.' },
+    { href: '/orders/payment', icon: 'fi-rr-credit-card', title: 'Bayar Midtrans', body: 'Customer menekan Bayar Sekarang dan status pembayaran berubah realtime dari webhook.' },
   ],
   en: [
     { href: '/orders/new', icon: 'fi-rr-location-crosshairs', title: 'Find nearby outlet', body: 'Users enable location, choose laundry, and route orders to that outlet.' },
-    { href: '/admin/dashboard', icon: 'fi-rr-megaphone', title: 'Admin flyer studio', body: 'Active admins edit promo, color, outlet name, and location.' },
+    { href: '/admin/dashboard', icon: 'fi-rr-tags', title: 'Outlet service pricing', body: 'Customers choose active services and price previews follow the selected outlet.' },
     { href: '/orders/history', icon: 'fi-rr-ballot', title: 'User order history', body: 'Order timeline, bills, and chat buttons follow realtime status.' },
     { href: '/admin/chat', icon: 'fi-rr-comment-alt', title: 'Admin chat inbox', body: 'Admins see incoming messages, unread badges, and quick status replies.' },
-    { href: '/admin/inventory', icon: 'fi-rr-box-open', title: 'Operational stock', body: 'Inventory for detergent, perfume, packaging, and outlet items.' },
+    { href: '/orders/payment', icon: 'fi-rr-credit-card', title: 'Midtrans payment', body: 'Customers tap Pay Now and payment status changes realtime from the webhook.' },
   ],
 };
 
@@ -81,21 +82,37 @@ const features = {
     { icon: 'fi-rr-waveform-path', title: 'Order realtime', body: 'Admin menerima update order dari outlet yang dipilih user.' },
     { icon: 'fi-rr-print', title: 'Nota thermal', body: 'Dashboard admin menyiapkan struk 58mm untuk POS laundry.' },
     { icon: 'fi-rr-tags', title: 'Harga layanan', body: 'Setiap outlet bisa mengatur harga cuci kering, cuci setrika, dan express.' },
-    { icon: 'fi-rr-credit-card', title: 'Pembayaran', body: 'Manual transfer tetap ada, tombol Midtrans siap memakai BFF saat server aktif.' },
+    { icon: 'fi-rr-credit-card', title: 'Pembayaran', body: 'Tombol Midtrans membuat transaksi, webhook mengubah status pembayaran realtime.' },
   ],
   en: [
     { icon: 'fi-rr-waveform-path', title: 'Realtime orders', body: 'Admins receive updates for orders routed to their outlet.' },
     { icon: 'fi-rr-print', title: 'Thermal receipt', body: 'The admin dashboard prepares 58mm POS receipts.' },
     { icon: 'fi-rr-tags', title: 'Service pricing', body: 'Each outlet manages dry wash, wash iron, and express pricing.' },
-    { icon: 'fi-rr-credit-card', title: 'Payment', body: 'Manual transfer remains, while Midtrans CTA is ready for the BFF.' },
+    { icon: 'fi-rr-credit-card', title: 'Payment', body: 'The Midtrans button creates a transaction and webhooks update payment status in realtime.' },
   ],
 };
 
 export function HomeExperience() {
   const language = useAppLanguage();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const t = copy[language];
+
+  function withCurrentContext(path: string) {
+    const params = new URLSearchParams();
+
+    ['isandroid', 'istablet', 'isdesktop', 'lang'].forEach((key) => {
+      const value = searchParams.get(key);
+      if (searchParams.has(key)) {
+        params.set(key, value ?? '');
+      }
+    });
+
+    const query = params.toString();
+    return `${path}${query ? `?${query}` : ''}`;
+  }
 
   useEffect(() => {
     let mounted = true;
@@ -128,28 +145,39 @@ export function HomeExperience() {
     };
   }, []);
 
-  if (profile?.role === 'USER') {
+  const isAdminProfile = profile?.role === 'ADMIN' || profile?.role === 'SUPERADMIN' || Boolean(profile?.staff_role);
+
+  useEffect(() => {
+    if (isAdminProfile) {
+      router.replace(withCurrentContext('/admin/dashboard'));
+    }
+  }, [isAdminProfile, router, searchParams]);
+
+  if (loading) {
+    return (
+      <main className="page user-dashboard-screen">
+        <section className="panel soft auth-skeleton">
+          <span className="skeleton skeleton-label" />
+          <span className="skeleton skeleton-value" />
+          <span className="skeleton skeleton-line" />
+          <span className="skeleton skeleton-line short" />
+        </section>
+      </main>
+    );
+  }
+
+  if (profile && !isAdminProfile) {
     return <UserDashboard profile={profile} />;
   }
 
-  if (profile?.role === 'ADMIN' || profile?.role === 'SUPERADMIN') {
+  if (profile && isAdminProfile) {
     return (
       <main className="page user-dashboard-screen">
         <section className="panel soft dashboard-hero">
           <div>
             <p className="eyebrow">{t.adminPortal}</p>
-            <h1>{profile.nama}</h1>
+            <h1>Membuka {t.dashboard.toLowerCase()}...</h1>
             <p className="muted">{t.adminBody}</p>
-          </div>
-          <div className="actions">
-            <Link className="button primary" href="/admin/dashboard">
-              <i className="fi fi-rr-apps" aria-hidden />
-              {t.dashboard}
-            </Link>
-            <Link className="button secondary" href="/admin/chat">
-              <i className="fi fi-rr-comment-alt" aria-hidden />
-              Chat
-            </Link>
           </div>
         </section>
       </main>

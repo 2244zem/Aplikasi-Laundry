@@ -36,6 +36,36 @@ function midtransAuthHeader() {
   return `Basic ${Buffer.from(`${midtransServerKey}:`).toString('base64')}`;
 }
 
+async function getRequestProfile(req) {
+  const header = req.headers.authorization || '';
+  const token = header.startsWith('Bearer ') ? header.slice('Bearer '.length).trim() : '';
+
+  if (!token) {
+    return null;
+  }
+
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser(token);
+
+  if (userError || !user) {
+    return null;
+  }
+
+  const { data: profile, error: profileError } = await supabase
+    .from('tabel_user')
+    .select('id,role,auth_user_id,email')
+    .eq('auth_user_id', user.id)
+    .maybeSingle();
+
+  if (profileError || !profile) {
+    return null;
+  }
+
+  return profile;
+}
+
 async function sendWhatsappMessage({ message, phoneNumber }) {
   if (!whatsappApiUrl || !whatsappApiToken || !phoneNumber) {
     return { skipped: true };
@@ -201,6 +231,12 @@ app.post('/api/v1/payment/create-laundry-order-transaction', async (req, res) =>
   }
 
   try {
+    const profile = await getRequestProfile(req);
+
+    if (!profile) {
+      return res.status(401).json({ ok: false, error: 'Login session is required.' });
+    }
+
     const { data: order, error: orderError } = await supabase
       .from('tabel_order')
       .select('*, tabel_user:user_id(id,nama,email)')
@@ -213,6 +249,10 @@ app.post('/api/v1/payment/create-laundry-order-transaction', async (req, res) =>
 
     if (!order) {
       return res.status(404).json({ ok: false, error: 'Order not found.' });
+    }
+
+    if (order.user_id !== profile.id && profile.role !== 'SUPERADMIN') {
+      return res.status(403).json({ ok: false, error: 'This order does not belong to the current user.' });
     }
 
     const amount = Number(order.total_harga || order.format_detail?.estimasi_harga || 0);

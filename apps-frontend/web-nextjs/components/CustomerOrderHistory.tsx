@@ -246,7 +246,7 @@ export function CustomerOrderHistory({ profile }: Props) {
                   </span>
                   <span>
                     <i className="fi fi-rr-shirt-long-sleeve" aria-hidden />
-                    {detail.estimasi_pakaian ?? '-'} pcs
+                    {detail.estimasi_pakaian ?? '-'} {detail.satuan || 'pcs'}
                   </span>
                   <span>
                     <i className="fi fi-rr-map-marker-home" aria-hidden />

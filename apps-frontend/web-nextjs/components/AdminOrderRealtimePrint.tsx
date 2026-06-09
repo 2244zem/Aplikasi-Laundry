@@ -2,10 +2,7 @@
 
 import type { CSSProperties } from 'react';
 import { useEffect, useState } from 'react';
-import { AdminQrScannerPanel } from '@/components/AdminQrScannerPanel';
-import { AdminRetentionPanel } from '@/components/AdminRetentionPanel';
 import { AdminServicePricingPanel } from '@/components/AdminServicePricingPanel';
-import { AdminStaffAccessPanel } from '@/components/AdminStaffAccessPanel';
 import { InteractiveChatLaundry } from '@/components/InteractiveChatLaundry';
 import { ListSkeleton } from '@/components/Skeleton';
 import { canEditOrderCommercials, canOperateOrders, operatorOutletId } from '@/lib/access';
@@ -72,7 +69,7 @@ function buildReceiptHtml(order: LaundryOrder) {
         <p>ID: ${escapeHtml(order.id.slice(0, 8))}</p>
         <p>User: ${escapeHtml(order.user_id)}</p>
         <p>Paket: ${escapeHtml(detail.paket ?? '-')}</p>
-        <p>Estimasi: ${escapeHtml(detail.estimasi_pakaian ?? '-')} pcs</p>
+        <p>Estimasi: ${escapeHtml(detail.estimasi_pakaian ?? '-')} ${escapeHtml(detail.satuan ?? 'pcs')}</p>
         <p>Alamat: ${escapeHtml(detail.alamat ?? '-')}</p>
         <p>Pickup: ${escapeHtml(detail.pickup_time ?? '-')}</p>
         <p>Catatan: ${escapeHtml(detail.catatan ?? '-')}</p>
@@ -103,81 +100,6 @@ function printOrder(order: LaundryOrder) {
   return true;
 }
 
-function qrPayload(order: LaundryOrder) {
-  return `UNGU:${order.qr_token || order.id}`;
-}
-
-function qrImageUrl(order: LaundryOrder) {
-  return `https://api.qrserver.com/v1/create-qr-code/?size=160x160&margin=1&data=${encodeURIComponent(qrPayload(order))}`;
-}
-
-async function printQrLabel(order: LaundryOrder) {
-  const printWindow = window.open('', '_blank', 'width=360,height=520');
-
-  if (!printWindow) {
-    return false;
-  }
-
-  printWindow.document.open();
-  printWindow.document.write(`
-    <html>
-      <head>
-        <title>Ungu Laundry QR ${escapeHtml(order.id.slice(0, 8))}</title>
-        <style>
-          body {
-            width: 58mm;
-            margin: 0;
-            padding: 8px;
-            font-family: Arial, sans-serif;
-            color: #111827;
-            text-align: center;
-          }
-
-          img {
-            height: 120px;
-            margin: 6px auto;
-            width: 120px;
-          }
-
-          h1 {
-            font-size: 15px;
-            margin: 0 0 5px;
-          }
-
-          p {
-            font-size: 12px;
-            margin: 4px 0;
-          }
-
-          strong {
-            display: block;
-            font-family: "Courier New", monospace;
-            font-size: 13px;
-            margin-top: 6px;
-          }
-        </style>
-      </head>
-      <body>
-        <h1>UNGU LAUNDRY</h1>
-        <p>Label keranjang cucian</p>
-        <img src="${qrImageUrl(order)}" alt="QR Order" />
-        <strong>${escapeHtml(qrPayload(order))}</strong>
-        <p>#${escapeHtml(order.id.slice(0, 8))} - ${escapeHtml(order.format_detail?.paket || 'Laundry')}</p>
-        <script>
-          window.onload = function () {
-            window.print();
-            window.setTimeout(function () { window.close(); }, 300);
-          };
-        </script>
-      </body>
-    </html>
-  `);
-  printWindow.document.close();
-
-  await supabase.from('tabel_order').update({ qr_label_printed_at: new Date().toISOString() }).eq('id', order.id);
-  return true;
-}
-
 function formatCurrency(value: number) {
   return new Intl.NumberFormat('id-ID', {
     currency: 'IDR',
@@ -198,6 +120,10 @@ function statusClass(order: LaundryOrder) {
   return 'status pending';
 }
 
+function orderStatusLabel(status: LaundryOrder['status_order']) {
+  return status === 'PENDING_CONFIRMATION' ? 'PENDING' : status;
+}
+
 type OrderRowProps = {
   order: LaundryOrder;
   profile: UserProfile;
@@ -213,7 +139,6 @@ function OrderCard({ order, profile, onChange, onOpenChat }: OrderRowProps) {
   const [message, setMessage] = useState('');
   const detail = order.format_detail ?? {};
   const outletId = operatorOutletId(profile);
-  const canClaim = !order.admin_outlet_id && canEditOrderCommercials(profile);
   const canEdit = order.admin_outlet_id === outletId || profile.role === 'SUPERADMIN';
   const canEditCommercials = canEdit && canEditOrderCommercials(profile);
   const statusIndex = Math.max(0, statusOptions.indexOf(order.status_order));
@@ -223,32 +148,6 @@ function OrderCard({ order, profile, onChange, onOpenChat }: OrderRowProps) {
     setTotalHarga(Number(order.total_harga ?? 0));
     setStatusOrder(order.status_order);
   }, [order.berat_kg, order.id, order.status_order, order.total_harga]);
-
-  async function claimOrder() {
-    setSaving(true);
-    setMessage('');
-
-    const { data, error } = await supabase
-      .from('tabel_order')
-      .update({
-        admin_outlet_id: profile.id,
-        status_order: 'DITERIMA',
-      })
-      .eq('id', order.id)
-      .select('*')
-      .single();
-
-    setSaving(false);
-
-    if (error) {
-      setMessage(error.message);
-      return;
-    }
-
-    onChange(data as LaundryOrder);
-    setStatusOrder('DITERIMA');
-    setMessage('Order diambil outlet.');
-  }
 
   async function saveOrder() {
     setSaving(true);
@@ -276,34 +175,6 @@ function OrderCard({ order, profile, onChange, onOpenChat }: OrderRowProps) {
     setMessage('Order diperbarui.');
   }
 
-  function shareCourierLocation() {
-    setMessage('');
-
-    if (!navigator.geolocation) {
-      setMessage('Browser tidak mendukung lokasi kurir.');
-      return;
-    }
-
-    navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        const { error } = await supabase.from('tabel_courier_location').upsert(
-          {
-            courier_user_id: profile.id,
-            latitude: position.coords.latitude,
-            longitude: position.coords.longitude,
-            order_id: order.id,
-            speed_kmh: position.coords.speed ? Number(position.coords.speed) * 3.6 : null,
-          },
-          { onConflict: 'order_id' },
-        );
-
-        setMessage(error ? error.message : 'Lokasi kurir dikirim ke user.');
-      },
-      () => setMessage('Izin lokasi ditolak. Aktifkan permission lokasi untuk tracking pickup.'),
-      { enableHighAccuracy: true, maximumAge: 15000, timeout: 10000 },
-    );
-  }
-
   return (
     <article className="order-ticket">
       <div className="ticket-head">
@@ -313,7 +184,7 @@ function OrderCard({ order, profile, onChange, onOpenChat }: OrderRowProps) {
           <p className="muted">{new Date(order.created_at).toLocaleString('id-ID')}</p>
         </div>
         <div className="ticket-status-stack">
-          <span className={statusClass(order)}>{order.status_order}</span>
+          <span className={statusClass(order)}>{orderStatusLabel(order.status_order)}</span>
           <span className="status subtle">{order.status_pembayaran}</span>
         </div>
       </div>
@@ -322,7 +193,7 @@ function OrderCard({ order, profile, onChange, onOpenChat }: OrderRowProps) {
         <div className="ticket-info">
           <span>
             <i className="fi fi-rr-shirt-long-sleeve" aria-hidden />
-            {detail.estimasi_pakaian ?? '-'} pcs
+            {detail.estimasi_pakaian ?? '-'} {detail.satuan || 'pcs'}
           </span>
           <span>
             <i className="fi fi-rr-map-marker-home" aria-hidden />
@@ -337,7 +208,7 @@ function OrderCard({ order, profile, onChange, onOpenChat }: OrderRowProps) {
         <div className="status-rail" aria-label="Progress order">
           {statusOptions.slice(0, 5).map((status, index) => (
             <span className={index <= statusIndex ? 'active' : ''} key={status}>
-              {status.replace('PENDING_CONFIRMATION', 'PENDING')}
+              {orderStatusLabel(status)}
             </span>
           ))}
         </div>
@@ -379,18 +250,12 @@ function OrderCard({ order, profile, onChange, onOpenChat }: OrderRowProps) {
                 onClick={() => setStatusOrder(status)}
                 type="button"
               >
-                {status.replace('PENDING_CONFIRMATION', 'PENDING')}
+                {orderStatusLabel(status)}
               </button>
             ))}
           </div>
         </div>
         <div className="actions">
-          {canClaim ? (
-            <button className="button secondary" disabled={saving} onClick={claimOrder} type="button">
-              <i className="fi fi-rr-badge-check" aria-hidden />
-              Claim
-            </button>
-          ) : null}
           <button className="button primary" disabled={!canEdit || saving} onClick={saveOrder} type="button">
             <i className="fi fi-rr-disk" aria-hidden />
             Simpan
@@ -398,14 +263,6 @@ function OrderCard({ order, profile, onChange, onOpenChat }: OrderRowProps) {
           <button className="button secondary" onClick={() => printOrder(order)} type="button">
             <i className="fi fi-rr-print" aria-hidden />
             Print
-          </button>
-          <button className="button secondary" onClick={() => void printQrLabel(order)} type="button">
-            <i className="fi fi-rr-qr-scan" aria-hidden />
-            Label QR
-          </button>
-          <button className="button secondary" disabled={!canEditCommercials} onClick={shareCourierLocation} type="button">
-            <i className="fi fi-rr-location-crosshairs" aria-hidden />
-            Lokasi
           </button>
           <button className="button secondary" onClick={() => onOpenChat(order)} type="button">
             <i className="fi fi-rr-comment-alt" aria-hidden />
@@ -625,9 +482,7 @@ export function AdminOrderRealtimePrint({ profile }: Props) {
       .limit(30);
 
     if (profile.role !== 'SUPERADMIN') {
-      request = profile.staff_role
-        ? request.eq('admin_outlet_id', outletId)
-        : request.or(`admin_outlet_id.is.null,admin_outlet_id.eq.${outletId}`);
+      request = request.eq('admin_outlet_id', outletId);
     }
 
     const { data, error } = await request;
@@ -645,7 +500,6 @@ export function AdminOrderRealtimePrint({ profile }: Props) {
   function canSeeOrder(nextOrder: LaundryOrder) {
     return (
       profile.role === 'SUPERADMIN' ||
-      nextOrder.admin_outlet_id == null ||
       nextOrder.admin_outlet_id === outletId
     );
   }
@@ -672,7 +526,7 @@ export function AdminOrderRealtimePrint({ profile }: Props) {
     }
 
     void loadOrders();
-  }, [isActiveAdmin, profile.id, profile.role]);
+  }, [isActiveAdmin, outletId, profile.id, profile.role]);
 
   useEffect(() => {
     if (!isActiveAdmin) {
@@ -720,7 +574,7 @@ export function AdminOrderRealtimePrint({ profile }: Props) {
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [isActiveAdmin, profile.id, profile.role]);
+  }, [isActiveAdmin, outletId, profile.id, profile.role]);
 
   if (!isActiveAdmin) {
     return (
@@ -748,9 +602,6 @@ export function AdminOrderRealtimePrint({ profile }: Props) {
           <p className="muted">Akses kamu dibatasi untuk operasional outlet sesuai role dari owner.</p>
         </section>
       )}
-      <AdminStaffAccessPanel profile={profile} />
-      <AdminRetentionPanel profile={profile} />
-      <AdminQrScannerPanel onScanned={syncOrder} profile={profile} />
 
       <section className="ops-hero">
         <div className="page-header">

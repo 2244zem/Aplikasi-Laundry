@@ -2,7 +2,6 @@
 
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
-import { LivePickupTracker } from '@/components/LivePickupTracker';
 import { ListSkeleton, MetricSkeleton } from '@/components/Skeleton';
 import { supabase } from '@/lib/supabaseClient';
 import { useAppLanguage, useLocalizedNumber } from '@/lib/i18n';
@@ -276,9 +275,6 @@ export function UserDashboard({ profile }: Props) {
                 {format.currency(Number(primaryOrder.total_harga || primaryOrder.format_detail?.estimasi_harga || 0))}
               </span>
             </div>
-            {primaryOrder.status_order !== 'SELESAI' && primaryOrder.status_order !== 'DIBATALKAN' ? (
-              <LivePickupTracker order={primaryOrder} />
-            ) : null}
           </div>
         ) : null}
 

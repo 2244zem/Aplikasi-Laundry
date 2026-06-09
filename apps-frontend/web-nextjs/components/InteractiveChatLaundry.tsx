@@ -229,7 +229,7 @@ export function InteractiveChatLaundry({ orderId, profile }: Props) {
             <p className="eyebrow">Order status</p>
             <h1>#{orderId.slice(0, 8)}</h1>
             <p className="muted">
-              {order?.format_detail?.outlet_name || 'Outlet'} · {order?.format_detail?.paket || 'Laundry'}
+              {order?.format_detail?.outlet_name || 'Outlet'} - {order?.format_detail?.paket || 'Laundry'}
             </p>
           </div>
           <span className={`status ${order?.status_order === 'SELESAI' ? 'done' : 'pending'}`}>
