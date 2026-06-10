@@ -54,7 +54,7 @@ spacing:
   desktopMaxWidth: 1200px
 components:
   buttonPrimary:
-    background: "linear-gradient(145deg, #95DFD3 0%, #1F4B5D 100%)"
+    background: "#1F4B5D"
     textColor: "#FFFFFF"
     rounded: "{rounded.md}"
   card:
@@ -93,10 +93,11 @@ Palette utama tidak berubah:
 Rules:
 
 - Gunakan teal untuk teks penting dan aksi utama.
-- Gunakan mint sebagai highlight, bukan sebagai warna dominan untuk seluruh screen.
+- Gunakan mint sebagai highlight, focus ring, selected state, dan skeleton lembut, bukan sebagai background besar.
 - Gunakan putih/paper sebagai mayoritas permukaan agar UI terasa lega.
 - Status semantik boleh memakai success/warning/danger, tetapi tetap dalam tone soft.
-- Hindari menambah ungu, biru terang, neon, beige dominan, atau gradient selain mint -> teal.
+- Hindari menambah ungu, biru terang, neon, beige dominan, glow, dan decorative gradient.
+- Gradient hanya boleh muncul untuk micro utility yang tidak terbaca sebagai dekorasi, seperti skeleton shimmer atau arrow select CSS.
 
 ## Typography
 
@@ -119,9 +120,16 @@ Rules:
 
 ## Elevation & Depth
 
-Depth dibuat dengan tonal layer, border, dan shadow kecil. Heavy floating card hanya untuk surface penting seperti payment card atau Android device frame.
+Depth dibuat dengan tonal layer, border, dan shadow kecil. Heavy floating card tidak dipakai untuk dashboard biasa.
 
 Default card shadow harus halus. Dashboard admin, table, list chat, dan finance lebih cocok terlihat seperti work surface daripada poster promosi.
+
+Gunakan flat surfaces:
+
+- Page background: `#F4FBF9` atau `#FAFAFA`.
+- Card background: `#FFFFFF`.
+- Border: `#CFE9E4` atau teal dengan opacity rendah.
+- Shadow: optional, sangat halus, hanya untuk device frame/tabbar jika perlu.
 
 ## Shapes
 
@@ -138,6 +146,7 @@ Buttons:
 - Secondary untuk navigasi atau aksi pendukung: `Chat`, `Riwayat`, `Refresh`.
 - Destructive hanya untuk hapus, batal, failed.
 - Button harus punya icon jika aksinya berulang.
+- Primary button solid teal. Jangan pakai gradient button.
 
 Inputs and Selects:
 
@@ -150,6 +159,7 @@ Cards and Panels:
 - Card dipakai untuk item berulang, form, table surface, modal, dan tool surface.
 - Section besar jangan dibuat seperti card mengambang jika hanya pemisah halaman.
 - Inner card dalam dashboard harus flat tanpa shadow berat.
+- Promo, membership, dan ad panel memakai card putih dengan accent strip mint, bukan banner gradient.
 
 Tables and Lists:
 
@@ -178,6 +188,7 @@ Do:
 - Do use skeleton loaders instead of plain spinners where possible.
 - Do keep Android screens one-column and touch-friendly.
 - Do verify text does not clip inside buttons, tabs, and chips.
+- Do make the first screen feel like a real app, not a generated showcase.
 
 Don't:
 
@@ -186,3 +197,4 @@ Don't:
 - Don't use oversized marketing hero type inside dashboards.
 - Don't rely on color only; pair status color with text.
 - Don't use native-looking dropdowns without styling.
+- Don't use decorative radial gradients, glow blobs, glossy cards, or fake mockup panels.

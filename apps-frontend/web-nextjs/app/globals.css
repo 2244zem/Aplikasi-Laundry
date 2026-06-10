@@ -4502,3 +4502,301 @@ h2 {
 .device-android .table-wrap {
   border-radius: var(--ui-radius);
 }
+
+/* Flat calm operations: remove decorative gradients and glow */
+:root {
+  --brand-gradient: #1F4B5D;
+  --brand-gradient-soft: #F4FBF9;
+  --shadow: 0 12px 28px rgba(31, 75, 93, 0.08);
+  --shadow-soft: 0 1px 0 rgba(31, 75, 93, 0.06);
+}
+
+body {
+  background: #F4FBF9;
+  color: var(--teal-deep);
+}
+
+.device-stage,
+.device-android,
+.device-tablet,
+.device-desktop {
+  background: #F4FBF9;
+}
+
+.device-desktop .device-frame,
+.device-tablet .device-frame,
+.device-android .device-frame {
+  background: #FAFAFA;
+  border-color: rgba(31, 75, 93, 0.12);
+  box-shadow: 0 12px 30px rgba(31, 75, 93, 0.08);
+}
+
+.device-desktop .device-frame::before {
+  background: #F4FBF9;
+  border-bottom-color: rgba(31, 75, 93, 0.1);
+}
+
+.app-shell,
+.device-android .app-shell {
+  background: #FAFAFA;
+}
+
+.topbar,
+.device-android .topbar,
+.device-android .device-statusbar {
+  background: #FAFAFA;
+  border-bottom: 1px solid rgba(31, 75, 93, 0.1);
+  box-shadow: none;
+  color: var(--teal-deep);
+}
+
+.brand,
+.device-android .brand {
+  color: var(--teal-deep);
+}
+
+.brand small,
+.device-android .brand small {
+  color: var(--muted);
+}
+
+.brand-mark,
+.icon-badge,
+.outlet-logo,
+.conversation-avatar,
+.payment-result-icon,
+.device-android .brand-mark {
+  background: #1F4B5D;
+  border-color: rgba(31, 75, 93, 0.12);
+  box-shadow: none;
+  color: #ffffff;
+}
+
+.language-toggle,
+.device-android .language-toggle {
+  background: #FFFFFF;
+  border-color: rgba(31, 75, 93, 0.14);
+  color: var(--teal-deep);
+}
+
+.button.primary,
+.button.confirm {
+  background: #1F4B5D;
+  box-shadow: none;
+  color: #ffffff;
+}
+
+.button.primary:hover,
+.button.confirm:hover {
+  background: #183D4B;
+}
+
+.button.secondary,
+.button.ghost,
+.nav-link:hover,
+.nav-link.active,
+.mobile-tab.active,
+.choice-pill.active,
+.choice-pill:hover,
+.service-option.active,
+.service-option:hover,
+.outlet-card.active,
+.radius-filter button.active,
+.radius-filter button:hover {
+  background: #EAF7F4;
+  border-color: rgba(31, 75, 93, 0.16);
+  box-shadow: none;
+  color: var(--teal-deep);
+}
+
+.app-card,
+.panel,
+.nearby-card,
+.mini-store-card,
+.order-ticket,
+.customer-status-card,
+.chat-status-card,
+.chat-shell,
+.workflow-panel,
+.bill-card,
+.inventory-card,
+.pricing-card,
+.conversation-card,
+.metric-card,
+.device-android .android-showcase-card,
+.device-android .home-copy,
+.device-android .workflow-card,
+.device-android .mobile-tabbar {
+  background: #FFFFFF;
+  border-color: rgba(31, 75, 93, 0.12);
+  box-shadow: none;
+}
+
+.panel.soft,
+.session-card,
+.ops-hero,
+.dashboard-hero,
+.page-header,
+.payment-result-hero,
+.payment-sandbox-note,
+.location-strip,
+.pickup-map-card,
+.low-stock-banner {
+  background: #FAFAFA;
+  border-color: rgba(31, 75, 93, 0.12);
+  box-shadow: none;
+}
+
+.workflow-header,
+.membership-card,
+.app-banner,
+.ad-card {
+  background: #FFFFFF;
+  border: 1px solid rgba(31, 75, 93, 0.12);
+  box-shadow: none;
+  color: var(--teal-deep);
+  position: relative;
+}
+
+.workflow-header::before,
+.membership-card::before,
+.app-banner::before,
+.ad-card::before {
+  background: #95DFD3;
+  border-radius: 999px;
+  content: "";
+  height: 4px;
+  left: 18px;
+  position: absolute;
+  right: 18px;
+  top: 12px;
+}
+
+.workflow-header h2,
+.workflow-header p,
+.membership-card h2,
+.membership-card h3,
+.membership-card p,
+.app-banner strong,
+.app-banner span,
+.ad-card h2,
+.ad-card h3,
+.ad-card p {
+  color: var(--teal-deep);
+}
+
+.ad-pill {
+  background: #EAF7F4;
+  border-color: rgba(31, 75, 93, 0.12);
+  color: var(--teal-deep);
+}
+
+.app-banner i,
+.ad-machine {
+  color: var(--teal-deep);
+  opacity: 0.12;
+}
+
+.payment-card {
+  background: #1F4B5D;
+  border-color: #1F4B5D;
+  box-shadow: none;
+  color: #ffffff;
+}
+
+.payment-card::after {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.payment-card-head span,
+.payment-card button {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.table-wrap,
+.receipt-preview.modern,
+.receipt-preview,
+.staff-card,
+.retention-card,
+.service-option,
+.outlet-card,
+.radius-filter button {
+  background: #FFFFFF;
+}
+
+.table th {
+  background: #EAF7F4;
+}
+
+.table tr:hover td {
+  background: #F4FBF9;
+}
+
+.nearby-media,
+.android-showcase-info em {
+  background: #EAF7F4;
+  color: var(--teal-deep);
+}
+
+.qr-video {
+  background: #1F4B5D;
+}
+
+.pickup-map {
+  background: #F4FBF9;
+}
+
+.map-grid-line {
+  background: rgba(31, 75, 93, 0.12);
+}
+
+.finance-chart-line {
+  filter: none;
+}
+
+.skeleton {
+  background:
+    linear-gradient(90deg, #EEF7F5, #FFFFFF, #EEF7F5),
+    #EEF7F5;
+}
+
+.device-android .android-showcase-card {
+  display: none;
+}
+
+.device-android .mobile-tabbar {
+  background: #FFFFFF;
+  border-color: rgba(31, 75, 93, 0.12);
+  bottom: 12px;
+  box-shadow: 0 6px 18px rgba(31, 75, 93, 0.08);
+}
+
+.device-android .mobile-tab.active {
+  background: #EAF7F4;
+  box-shadow: none;
+}
+
+.device-android .home-stats span {
+  background: #FFFFFF;
+  border-color: rgba(31, 75, 93, 0.12);
+  color: var(--muted);
+}
+
+.device-android .home-stats strong {
+  color: var(--teal-deep);
+}
+
+.feature-grid {
+  grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
+}
+
+.feature-card {
+  min-width: 0;
+}
+
+.feature-card h2,
+.feature-card p {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
