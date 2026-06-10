@@ -6,6 +6,7 @@
 | --- | --- | --- |
 | Frontend web | Next.js | Customer app and admin dashboard |
 | Realtime database | Supabase Postgres + Realtime | Orders, users, chat, live status updates |
+| Operational cache | Redis / Upstash Redis | Payment locks, short-lived status cache, and read-pressure relief |
 | Backend-for-Frontend | Node.js Express | Midtrans webhook, server-only updates, privileged writes |
 | Finance service | Java Spring Boot | Scheduled monthly outlet finance aggregation |
 | Payment gateway | Midtrans Snap/Core/Subscription | Laundry order payments and admin SaaS subscriptions |
@@ -60,7 +61,11 @@ SUPABASE_ANON_KEY="sb_publishable_fLNn9cozUb_p0K9ND-KWyA_BPRucYtJ"
 SUPABASE_SERVICE_ROLE_KEY="[YOUR-SUPABASE-SERVICE-ROLE-KEY]"
 DATABASE_URL="postgresql://postgres:[YOUR-PASSWORD]@db.nlowbwnnzyywftsseamc.supabase.co:5432/postgres"
 MIDTRANS_SERVER_KEY="[YOUR-MIDTRANS-SERVER-KEY]"
+MIDTRANS_KEY_ENV="sandbox"
 MIDTRANS_IS_PRODUCTION="false"
+REDIS_ENABLED="false"
+REDIS_URL=""
+CACHE_TTL_SECONDS="30"
 ```
 
 Finance service `.env`:
@@ -73,11 +78,64 @@ SPRING_DATASOURCE_PASSWORD="[YOUR-PASSWORD]"
 SCALEWASH_FINANCE_ZONE="Asia/Jakarta"
 ```
 
+Redis production example:
+
+```env
+REDIS_ENABLED="true"
+REDIS_URL="rediss://default:[UPSTASH-PASSWORD]@[UPSTASH-HOST]:6379"
+CACHE_TTL_SECONDS="30"
+```
+
 Important security boundary:
 
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY` can be used in the browser with Row Level Security policies.
 - `SUPABASE_SERVICE_ROLE_KEY` must only exist on the backend. It bypasses Row Level Security and is required for webhook-driven role/subscription changes.
 - `MIDTRANS_SERVER_KEY` must only exist on the backend. It is used to verify Midtrans notification authenticity.
+- `REDIS_URL` must only exist on backend services. The browser never connects directly to Redis.
+
+## Redis Cache and Locking
+
+Redis is optional in v1. Postgres/Supabase remains the source of truth for all transactional data.
+
+The BFF uses Redis for:
+
+- Short-lived `/health` payment readiness cache.
+- Midtrans status cache per `midtrans_order_id`.
+- `sync-payment:{orderId}` lock so repeated status checks do not hammer Midtrans.
+- `create-payment:{orderId}` lock so double-clicks do not create parallel transactions.
+- Cached Midtrans Snap redirect payload for a pending order when available.
+
+Failure behavior:
+
+- If `REDIS_ENABLED=false` or `REDIS_URL` is empty, Redis is reported as `disabled`.
+- If Redis is down, BFF reports `redis.status=offline` in `/health`.
+- Payment and sync endpoints continue using Supabase and Midtrans directly when Redis is unavailable.
+
+Local Redis options:
+
+```bash
+docker run --name ungu-redis -p 6379:6379 redis:7-alpine
+```
+
+Then set:
+
+```env
+REDIS_ENABLED="true"
+REDIS_URL="redis://127.0.0.1:6379"
+```
+
+## Cassandra Read Archive Direction
+
+Cassandra is not used as a backup/failover database for Postgres in v1. The transactional tables need relational integrity, RLS, realtime publication, and payment consistency, so Supabase Postgres remains authoritative.
+
+If event volume becomes large, Cassandra can be added later as append-only read storage for:
+
+- `order_events_by_order`
+- `chat_messages_by_order_archive`
+- `courier_locations_by_order_day`
+- `payment_events_by_order`
+
+The future write model should keep Postgres first, then copy events asynchronously from the BFF or a worker into Cassandra. UI reads should stay on Supabase until a Cassandra read model is explicitly introduced.
 
 ## Realtime Setup
 

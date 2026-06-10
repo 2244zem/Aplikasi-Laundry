@@ -3,6 +3,7 @@ const cors = require('cors');
 const dotenv = require('dotenv');
 const express = require('express');
 const { createClient } = require('@supabase/supabase-js');
+const { acquireLock, cacheTtlSeconds, getJson, getRedisStatus, setJson } = require('./redisClient');
 
 dotenv.config();
 
@@ -20,6 +21,8 @@ const publicBffBaseUrl = process.env.BFF_PUBLIC_BASE_URL || process.env.PUBLIC_B
 const configuredMidtransWebhookUrl = process.env.MIDTRANS_WEBHOOK_URL || '';
 const whatsappApiUrl = process.env.WHATSAPP_API_URL;
 const whatsappApiToken = process.env.WHATSAPP_API_TOKEN;
+const midtransStatusCacheTtlSeconds = Math.min(cacheTtlSeconds(30), 30);
+const checkoutCacheTtlSeconds = 15 * 60;
 
 if (!supabaseUrl || !supabaseServiceRoleKey || !midtransServerKey) {
   throw new Error('Missing SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, or MIDTRANS_SERVER_KEY.');
@@ -135,6 +138,19 @@ function buildMidtransReadiness() {
     webhook_url_configured: webhookUrlConfigured,
     warnings,
   };
+}
+
+async function getCachedMidtransReadiness() {
+  const cacheKey = 'health:midtrans-readiness';
+  const cachedReadiness = await getJson(cacheKey);
+
+  if (cachedReadiness) {
+    return cachedReadiness;
+  }
+
+  const readiness = buildMidtransReadiness();
+  await setJson(cacheKey, readiness, cacheTtlSeconds(30));
+  return readiness;
 }
 
 function resolveRequestOrigin(req) {
@@ -463,6 +479,13 @@ function laundryPaymentStatusFromMidtrans(transactionStatus) {
 }
 
 async function fetchMidtransTransactionStatus(midtransOrderId) {
+  const cacheKey = `midtrans-status:${midtransOrderId}`;
+  const cachedStatus = await getJson(cacheKey);
+
+  if (cachedStatus) {
+    return cachedStatus;
+  }
+
   const response = await fetch(midtransStatusUrl(midtransOrderId), {
     headers: {
       Accept: 'application/json',
@@ -479,6 +502,7 @@ async function fetchMidtransTransactionStatus(midtransOrderId) {
     throw error;
   }
 
+  await setJson(cacheKey, payload, midtransStatusCacheTtlSeconds);
   return payload;
 }
 
@@ -519,13 +543,14 @@ async function applyLaundryOrderPaymentStatus(order, midtransPayload) {
   };
 }
 
-app.get('/health', (_req, res) => {
-  const readiness = buildMidtransReadiness();
+app.get('/health', async (_req, res) => {
+  const readiness = await getCachedMidtransReadiness();
 
   res.json({
     midtrans: readiness,
     midtrans_environment: readiness.environment,
     ok: true,
+    redis: getRedisStatus(),
     service: 'scalewash-bff-service',
   });
 });
@@ -536,6 +561,8 @@ app.post('/api/v1/payment/create-laundry-order-transaction', async (req, res) =>
   if (!orderId) {
     return res.status(400).json({ ok: false, error: 'Missing orderId.' });
   }
+
+  let createPaymentLock;
 
   try {
     const authResult = await getRequestProfile(req);
@@ -549,6 +576,14 @@ app.post('/api/v1/payment/create-laundry-order-transaction', async (req, res) =>
     }
 
     const { profile } = authResult;
+    createPaymentLock = await acquireLock(`lock:create-payment:${orderId}`, 20);
+
+    if (!createPaymentLock.acquired) {
+      return res.status(409).json({
+        ok: false,
+        error: 'Transaksi sedang dibuat. Tunggu beberapa detik lalu cek halaman Bayar.',
+      });
+    }
 
     const { data: order, error: orderError } = await supabase
       .from('tabel_order')
@@ -582,6 +617,23 @@ app.post('/api/v1/payment/create-laundry-order-transaction', async (req, res) =>
       return res.status(400).json({
         ok: false,
         error: 'Total order belum valid. Admin wajib mengisi harga final minimal Rp 1.000 sebelum customer bisa membayar.',
+      });
+    }
+
+    const checkoutCacheKey = `payment-checkout:${order.id}`;
+    const cachedCheckout = order.status_pembayaran === 'PENDING'
+      ? await getJson(checkoutCacheKey)
+      : null;
+
+    if (
+      cachedCheckout?.redirect_url
+      && cachedCheckout?.midtrans_order_id
+      && cachedCheckout.midtrans_order_id === order.midtrans_order_id
+    ) {
+      return res.json({
+        ...cachedCheckout,
+        cached: true,
+        ok: true,
       });
     }
 
@@ -646,15 +698,23 @@ app.post('/api/v1/payment/create-laundry-order-transaction', async (req, res) =>
       throw updateError;
     }
 
-    return res.json({
+    const responsePayload = {
       ok: true,
       midtrans_order_id: midtransOrderId,
       redirect_url: midtransPayload.redirect_url,
       token: midtransPayload.token,
-    });
+    };
+
+    await setJson(checkoutCacheKey, responsePayload, checkoutCacheTtlSeconds);
+
+    return res.json(responsePayload);
   } catch (error) {
     console.error('Failed to create Midtrans transaction:', error);
     return res.status(500).json({ ok: false, error: 'Failed to create Midtrans transaction.' });
+  } finally {
+    if (createPaymentLock?.acquired) {
+      await createPaymentLock.release();
+    }
   }
 });
 
@@ -664,6 +724,8 @@ app.post('/api/v1/payment/sync-laundry-order-status', async (req, res) => {
   if (!orderId) {
     return res.status(400).json({ ok: false, error: 'Missing orderId.' });
   }
+
+  let syncPaymentLock;
 
   try {
     const authResult = await getRequestProfile(req);
@@ -677,6 +739,16 @@ app.post('/api/v1/payment/sync-laundry-order-status', async (req, res) => {
     }
 
     const { profile } = authResult;
+    syncPaymentLock = await acquireLock(`lock:sync-payment:${orderId}`, 15);
+
+    if (!syncPaymentLock.acquired) {
+      return res.status(202).json({
+        ok: true,
+        syncing: true,
+        updated: false,
+      });
+    }
+
     const { data: order, error: orderError } = await supabase
       .from('tabel_order')
       .select('*')
@@ -720,6 +792,10 @@ app.post('/api/v1/payment/sync-laundry-order-status', async (req, res) => {
       ok: false,
       error: error.message || 'Failed to sync Midtrans transaction status.',
     });
+  } finally {
+    if (syncPaymentLock?.acquired) {
+      await syncPaymentLock.release();
+    }
   }
 });
 
