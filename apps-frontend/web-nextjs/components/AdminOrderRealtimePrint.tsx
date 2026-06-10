@@ -37,6 +37,9 @@ function escapeHtml(value: unknown) {
 
 function buildReceiptHtml(order: LaundryOrder) {
   const detail = order.format_detail ?? {};
+  const orderTotal = Number(order.total_harga || detail.estimasi_harga || 0);
+  const outletName = detail.outlet_name || 'UNGU LAUNDRY';
+  const outletAddress = detail.outlet_address || '-';
 
   return `
     <html>
@@ -58,28 +61,66 @@ function buildReceiptHtml(order: LaundryOrder) {
             text-align: center;
           }
 
+          h2 {
+            margin: 8px 0 4px;
+            font-size: 12px;
+            text-align: center;
+          }
+
           p {
             margin: 4px 0;
+          }
+
+          ol {
+            margin: 4px 0 0;
+            padding-left: 14px;
+          }
+
+          li {
+            margin: 3px 0;
           }
 
           .line {
             border-top: 1px dashed #111827;
             margin: 8px 0;
           }
+
+          .center {
+            text-align: center;
+          }
+
+          .small {
+            font-size: 10px;
+            line-height: 1.35;
+          }
         </style>
       </head>
       <body>
-        <h1>UNGU LAUNDRY NOTA</h1>
+        <h1>${escapeHtml(outletName).toUpperCase()}</h1>
+        <p class="center small">${escapeHtml(outletAddress)}</p>
+        <div class="line"></div>
         <p>ID: ${escapeHtml(order.id.slice(0, 8))}</p>
-        <p>User: ${escapeHtml(order.user_id)}</p>
+        <p>Tanggal: ${escapeHtml(new Date(order.created_at).toLocaleString('id-ID'))}</p>
         <p>Paket: ${escapeHtml(detail.paket ?? '-')}</p>
         <p>Estimasi: ${escapeHtml(detail.estimasi_pakaian ?? '-')} ${escapeHtml(detail.satuan ?? 'pcs')}</p>
+        <p>Berat final: ${escapeHtml(order.berat_kg || '-')} kg</p>
         <p>Alamat: ${escapeHtml(detail.alamat ?? '-')}</p>
         <p>Pickup: ${escapeHtml(detail.pickup_time ?? '-')}</p>
         <p>Catatan: ${escapeHtml(detail.catatan ?? '-')}</p>
         <div class="line"></div>
         <p>Status: ${escapeHtml(order.status_order)}</p>
-        <p>Input berat dan harga final di dashboard.</p>
+        <p>Pembayaran: ${escapeHtml(order.status_pembayaran)}</p>
+        <p>Total: ${escapeHtml(formatCurrency(orderTotal))}</p>
+        <div class="line"></div>
+        <h2>KETENTUAN</h2>
+        <ol class="small">
+          <li>Komplain diterima maksimal 1x24 jam setelah pakaian diterima.</li>
+          <li>Barang mudah luntur, susut, atau rusak karena kondisi bahan bukan tanggung jawab outlet.</li>
+          <li>Jumlah pakaian mengikuti data timbang dan catatan outlet.</li>
+          <li>Simpan nota ini sebagai bukti transaksi.</li>
+        </ol>
+        <div class="line"></div>
+        <p class="center">*** TERIMA KASIH ***</p>
         <script>
           window.onload = function () {
             window.print();

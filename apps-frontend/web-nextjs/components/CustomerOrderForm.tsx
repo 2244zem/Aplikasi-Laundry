@@ -106,6 +106,28 @@ function serviceIcon(serviceName: string) {
   return 'fi-rr-washer';
 }
 
+function buildInitialChatMessage(order: LaundryOrder) {
+  const detail = order.format_detail ?? {};
+  const price = Number(order.total_harga || detail.estimasi_harga || 0);
+
+  return [
+    'Halo admin, saya baru membuat order pickup.',
+    '',
+    `Order: #${order.id.slice(0, 8)}`,
+    `Outlet: ${detail.outlet_name || 'Outlet laundry'}`,
+    `Layanan: ${detail.paket || 'Laundry'}`,
+    `Estimasi: ${detail.estimasi_pakaian ?? '-'} ${detail.satuan || 'pcs'}`,
+    `Alamat: ${detail.alamat || '-'}`,
+    `Pickup: ${detail.pickup_time || 'Fleksibel'}`,
+    `Estimasi harga: ${formatCurrency(price)}`,
+    detail.catatan ? `Catatan: ${detail.catatan}` : '',
+    '',
+    'Mohon dicek dan dikonfirmasi. Terima kasih.',
+  ]
+    .filter(Boolean)
+    .join('\n');
+}
+
 function distanceKm(from: UserLocation | null, outlet: OutletProfile) {
   if (!from || outlet.outlet_latitude == null || outlet.outlet_longitude == null) {
     return null;
@@ -432,9 +454,20 @@ export function CustomerOrderForm({ profile }: Props) {
     }
 
     const nextOrder = data as LaundryOrder;
+    const { error: chatError } = await supabase.from('tabel_chat_message').insert({
+      order_id: nextOrder.id,
+      sender_user_id: profile.id,
+      receiver_user_id: selectedOutlet.id,
+      message: buildInitialChatMessage(nextOrder),
+    });
+
     setCreatedOrderId(nextOrder.id);
     setActiveOrders((currentOrders) => upsertOrderList(currentOrders, nextOrder));
-    setMessage(`Order terkirim ke ${outletName(selectedOutlet)}.`);
+    setMessage(
+      chatError
+        ? `Order terkirim ke ${outletName(selectedOutlet)}, tetapi pesan awal chat gagal dibuat: ${chatError.message}`
+        : `Order terkirim ke ${outletName(selectedOutlet)} dan chat awal sudah dibuat.`,
+    );
     setAlamat('');
     setCatatan('');
     setPickupTime('');
