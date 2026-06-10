@@ -614,7 +614,7 @@ export function CustomerOrderForm({ profile }: Props) {
       </section>
 
       <aside className="order-side">
-        <div className="ad-card" style={{ '--ad-accent': selectedOutlet?.flyer_accent || '#20bdd6' } as CSSProperties}>
+        <div className="ad-card" style={{ '--ad-accent': selectedOutlet?.flyer_accent || '#95DFD3' } as CSSProperties}>
           <span className="ad-pill">{selectedOutlet?.flyer_discount_label || 'Member aktif'}</span>
           <h2>{selectedOutlet?.flyer_title || 'Laundry bersih, pickup cepat.'}</h2>
           <p>

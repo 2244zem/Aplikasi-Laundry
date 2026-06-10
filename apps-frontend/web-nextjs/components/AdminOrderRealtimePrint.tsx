@@ -307,7 +307,7 @@ function AdminOutletStudio({ profile }: Props) {
   const [flyerBody, setFlyerBody] = useState(
     profile.flyer_body || 'Promo member aktif: pickup prioritas, nota otomatis, dan chat bukti kondisi pakaian.',
   );
-  const [flyerAccent, setFlyerAccent] = useState(profile.flyer_accent || '#20bdd6');
+  const [flyerAccent, setFlyerAccent] = useState(profile.flyer_accent || '#95DFD3');
   const [flyerDiscount, setFlyerDiscount] = useState(profile.flyer_discount_label || 'Diskon 20%');
   const [outletIsOpen, setOutletIsOpen] = useState(profile.outlet_is_open ?? true);
   const [pickupEta, setPickupEta] = useState(profile.outlet_pickup_eta_minutes?.toString() || '30');

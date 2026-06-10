@@ -3861,3 +3861,407 @@ h3 {
   background: linear-gradient(145deg, var(--lavender-200), #ffffff);
   box-shadow: inset 0 0 0 1px #d8cdef;
 }
+
+/* Calm mint-teal palette refresh */
+:root {
+  --teal-mint: #95DFD3;
+  --teal-deep: #1F4B5D;
+  --paper: #FAFAFA;
+  --ink: #1F4B5D;
+  --muted: #60757C;
+  --line: #CFE9E4;
+  --soft-line: #E7F5F2;
+  --surface: #FAFAFA;
+  --wash: #F4FBF9;
+  --blue-900: #1F4B5D;
+  --blue-700: #1F4B5D;
+  --blue-100: #E7F5F2;
+  --cyan-500: #95DFD3;
+  --mint-500: #95DFD3;
+  --rose-400: #A85B65;
+  --yellow-300: #E3C874;
+  --success: #2F7D63;
+  --warning: #9A6A22;
+  --danger: #A8424A;
+  --plum-950: #173B49;
+  --plum-900: #1F4B5D;
+  --plum-800: #1F4B5D;
+  --plum-700: #2E6D7D;
+  --lavender-200: #DDF4F0;
+  --lavender-100: #EFF9F7;
+  --ivory: #FAFAFA;
+  --champagne: #95DFD3;
+  --brand-gradient: linear-gradient(145deg, #95DFD3 0%, #1F4B5D 100%);
+  --brand-gradient-soft: linear-gradient(135deg, rgba(149, 223, 211, 0.28), rgba(31, 75, 93, 0.08));
+  --shadow: 0 22px 54px rgba(31, 75, 93, 0.14);
+  --shadow-soft: 0 12px 32px rgba(31, 75, 93, 0.08);
+}
+
+::selection {
+  background: rgba(149, 223, 211, 0.72);
+  color: var(--teal-deep);
+}
+
+* {
+  scrollbar-color: rgba(31, 75, 93, 0.28) transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(31, 75, 93, 0.32);
+}
+
+body {
+  background:
+    radial-gradient(circle at 10% 0%, rgba(149, 223, 211, 0.32), transparent 34%),
+    linear-gradient(180deg, #FAFAFA 0%, #F4FBF9 48%, #EEF8F5 100%);
+  color: var(--teal-deep);
+}
+
+.device-desktop .device-frame,
+.device-tablet .device-frame,
+.device-android .device-frame {
+  border-color: rgba(31, 75, 93, 0.12);
+  box-shadow: var(--shadow);
+}
+
+.app-shell {
+  background:
+    linear-gradient(180deg, rgba(250, 250, 250, 0.96), rgba(244, 251, 249, 0.94)),
+    var(--paper);
+}
+
+.topbar {
+  background: rgba(250, 250, 250, 0.92);
+  border-bottom: 1px solid rgba(207, 233, 228, 0.92);
+  box-shadow: 0 12px 34px rgba(31, 75, 93, 0.045);
+}
+
+.brand,
+.brand small,
+h1,
+h2,
+h3,
+.finance-chart-head strong,
+.low-stock-banner strong,
+.android-showcase-info strong {
+  color: var(--teal-deep);
+}
+
+.brand small,
+.muted,
+.android-showcase-info span,
+.low-stock-banner span {
+  color: var(--muted);
+}
+
+.brand-mark,
+.icon-badge,
+.outlet-logo,
+.button.primary,
+.button.confirm,
+.workflow-header,
+.membership-card,
+.app-banner,
+.ad-card {
+  background: var(--brand-gradient);
+  box-shadow: 0 16px 34px rgba(31, 75, 93, 0.18);
+}
+
+.nav-link,
+.mobile-tab {
+  color: rgba(31, 75, 93, 0.72);
+}
+
+.nav-link:hover,
+.nav-link.active,
+.mobile-tab.active,
+.choice-pill.active,
+.choice-pill:hover,
+.service-option.active,
+.service-option:hover,
+.outlet-card.active {
+  background: rgba(149, 223, 211, 0.28);
+  border-color: rgba(31, 75, 93, 0.16);
+  color: var(--teal-deep);
+}
+
+.app-card,
+.panel,
+.nearby-card,
+.mini-store-card,
+.order-ticket,
+.customer-status-card,
+.chat-status-card,
+.chat-shell,
+.workflow-panel,
+.payment-card,
+.bill-card,
+.inventory-card,
+.pricing-card,
+.conversation-card {
+  background: rgba(250, 250, 250, 0.94);
+  border-color: rgba(207, 233, 228, 0.98);
+  box-shadow: var(--shadow-soft);
+}
+
+.panel.soft,
+.session-card,
+.ops-hero,
+.dashboard-hero,
+.page-header,
+.payment-result-hero,
+.payment-sandbox-note {
+  background:
+    linear-gradient(135deg, rgba(149, 223, 211, 0.2), rgba(250, 250, 250, 0.94)),
+    var(--paper);
+  border-color: rgba(207, 233, 228, 0.98);
+}
+
+.eyebrow,
+.service-option i,
+.nearby-media,
+.feature-card i,
+.ticket-info i,
+.empty-state i,
+.finance-chart-line,
+.ticket-id,
+.link-button {
+  color: var(--teal-deep);
+}
+
+.button.primary,
+.button.confirm {
+  color: #ffffff;
+}
+
+.button.secondary,
+.button.ghost {
+  background: rgba(149, 223, 211, 0.22);
+  border-color: rgba(31, 75, 93, 0.12);
+  color: var(--teal-deep);
+}
+
+.button.destructive {
+  background: rgba(168, 66, 74, 0.1);
+  border-color: rgba(168, 66, 74, 0.22);
+  color: var(--danger);
+}
+
+.input,
+.textarea,
+.select {
+  background: rgba(250, 250, 250, 0.98);
+  border-color: rgba(31, 75, 93, 0.18);
+  color: var(--teal-deep);
+}
+
+.select {
+  appearance: none;
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--teal-deep) 50%),
+    linear-gradient(135deg, var(--teal-deep) 50%, transparent 50%);
+  background-position:
+    calc(100% - 18px) 52%,
+    calc(100% - 13px) 52%;
+  background-repeat: no-repeat;
+  background-size: 5px 5px, 5px 5px;
+  padding-right: 42px;
+}
+
+.input:focus,
+.textarea:focus,
+.select:focus {
+  border-color: var(--teal-deep);
+  box-shadow: 0 0 0 3px rgba(149, 223, 211, 0.34);
+}
+
+.workflow-card:hover,
+.outlet-card:hover,
+.nearby-card:hover,
+.order-ticket:hover,
+.conversation-card:hover {
+  border-color: rgba(31, 75, 93, 0.2);
+  box-shadow: 0 18px 36px rgba(31, 75, 93, 0.11);
+}
+
+.ad-pill,
+.android-showcase-info em,
+.status.pending,
+.status.info,
+.badge.info,
+.readiness-item.warning {
+  background: rgba(149, 223, 211, 0.24);
+  border-color: rgba(31, 75, 93, 0.14);
+  color: var(--teal-deep);
+}
+
+.status.success,
+.badge.success,
+.readiness-item.ready {
+  background: rgba(47, 125, 99, 0.12);
+  border-color: rgba(47, 125, 99, 0.22);
+  color: var(--success);
+}
+
+.status.danger,
+.badge.danger,
+.readiness-item.danger {
+  background: rgba(168, 66, 74, 0.1);
+  border-color: rgba(168, 66, 74, 0.2);
+  color: var(--danger);
+}
+
+.skeleton {
+  background:
+    linear-gradient(90deg, rgba(149, 223, 211, 0.34), rgba(250, 250, 250, 0.88), rgba(149, 223, 211, 0.34)),
+    rgba(239, 249, 247, 0.9);
+}
+
+.skeleton-row {
+  background: rgba(250, 250, 250, 0.88);
+  border-color: rgba(207, 233, 228, 0.88);
+}
+
+.finance-chart-grid {
+  stroke: rgba(31, 75, 93, 0.14);
+}
+
+.finance-chart-line {
+  filter: drop-shadow(0 10px 18px rgba(31, 75, 93, 0.18));
+  stroke: var(--teal-deep);
+}
+
+.finance-chart-dot {
+  fill: #FAFAFA;
+  stroke: var(--teal-deep);
+}
+
+.low-stock-banner {
+  background:
+    linear-gradient(135deg, rgba(149, 223, 211, 0.22), #FAFAFA 70%),
+    #FAFAFA;
+  border-color: rgba(31, 75, 93, 0.14);
+  color: var(--teal-deep);
+}
+
+.payment-card {
+  background: var(--brand-gradient);
+  border-color: transparent;
+  box-shadow: 0 24px 44px rgba(31, 75, 93, 0.18);
+  color: #ffffff;
+}
+
+.payment-card small,
+.payment-card p,
+.payment-card > div:last-child span,
+.payment-card button {
+  color: #ffffff;
+}
+
+.payment-card button {
+  background: rgba(250, 250, 250, 0.16);
+  border-color: rgba(250, 250, 250, 0.24);
+}
+
+.qr-video {
+  background:
+    linear-gradient(135deg, rgba(149, 223, 211, 0.82), rgba(31, 75, 93, 0.9)),
+    var(--teal-deep);
+  border-color: rgba(207, 233, 228, 0.98);
+}
+
+.pickup-map-card {
+  background:
+    linear-gradient(135deg, rgba(149, 223, 211, 0.18), rgba(250, 250, 250, 0.96)),
+    #FAFAFA;
+  border-color: rgba(207, 233, 228, 0.98);
+}
+
+.pickup-map {
+  background:
+    radial-gradient(circle at 28% 26%, rgba(149, 223, 211, 0.26), transparent 20%),
+    linear-gradient(135deg, #EFF9F7, #FAFAFA);
+  border-color: rgba(207, 233, 228, 0.98);
+}
+
+.map-grid-line {
+  background: rgba(31, 75, 93, 0.12);
+}
+
+.staff-card,
+.retention-card {
+  background: #FAFAFA;
+  border-color: rgba(207, 233, 228, 0.98);
+}
+
+.device-android {
+  background:
+    radial-gradient(circle at 12% 12%, rgba(250, 250, 250, 0.5), transparent 24%),
+    linear-gradient(145deg, #95DFD3 0%, #1F4B5D 100%);
+}
+
+.device-android .device-frame {
+  background: #FAFAFA;
+  box-shadow:
+    0 36px 70px rgba(31, 75, 93, 0.3),
+    0 0 0 1px rgba(250, 250, 250, 0.32);
+}
+
+.device-android .device-statusbar,
+.device-android .topbar {
+  background: linear-gradient(135deg, #95DFD3 0%, #1F4B5D 100%);
+  box-shadow: 0 16px 28px rgba(31, 75, 93, 0.18);
+}
+
+.device-android .app-shell {
+  background: linear-gradient(180deg, #FAFAFA 0%, #F1FAF7 55%, #FAFAFA 100%);
+}
+
+.device-android .brand,
+.device-android .brand small,
+.device-android .language-toggle {
+  color: #ffffff;
+}
+
+.device-android .brand-mark,
+.device-android .language-toggle {
+  background: rgba(250, 250, 250, 0.16);
+  border-color: rgba(250, 250, 250, 0.24);
+}
+
+.device-android .android-showcase-card,
+.device-android .home-copy,
+.device-android .workflow-card,
+.device-android .mobile-tabbar {
+  background: rgba(250, 250, 250, 0.94);
+  border-color: rgba(207, 233, 228, 0.98);
+  box-shadow: 0 16px 30px rgba(31, 75, 93, 0.1);
+}
+
+.device-android .android-showcase-visual {
+  background:
+    radial-gradient(circle at 72% 22%, rgba(250, 250, 250, 0.72), transparent 16%),
+    linear-gradient(145deg, rgba(149, 223, 211, 0.74) 0%, rgba(250, 250, 250, 0.96) 54%, rgba(31, 75, 93, 0.16) 100%);
+}
+
+.device-android .android-showcase-visual::before {
+  background:
+    linear-gradient(90deg, rgba(31, 75, 93, 0.18) 1px, transparent 1px),
+    linear-gradient(180deg, rgba(31, 75, 93, 0.12) 1px, transparent 1px),
+    rgba(250, 250, 250, 0.38);
+}
+
+.device-android .android-showcase-visual::after {
+  background: linear-gradient(180deg, rgba(31, 75, 93, 0.14), rgba(31, 75, 93, 0));
+}
+
+.device-android .android-scene-machine,
+.device-android .android-scene-shirt {
+  color: var(--teal-deep);
+}
+
+.device-android .home-stats span,
+.device-android .mobile-tab.active {
+  background: linear-gradient(145deg, rgba(149, 223, 211, 0.45), #FAFAFA);
+  box-shadow: inset 0 0 0 1px rgba(31, 75, 93, 0.12);
+}

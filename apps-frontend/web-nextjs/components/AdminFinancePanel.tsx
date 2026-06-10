@@ -93,7 +93,7 @@ function FinanceAreaChart({ data, total }: { data: ChartPoint[]; total: number }
         <svg viewBox={`0 0 ${width} ${height}`} role="img">
           <defs>
             <linearGradient id="financeAreaGradient" x1="0" x2="0" y1="0" y2="1">
-              <stop offset="0%" stopColor="rgba(77, 47, 177, 0.24)" />
+              <stop offset="0%" stopColor="rgba(149, 223, 211, 0.36)" />
               <stop offset="100%" stopColor="rgba(255, 255, 255, 0)" />
             </linearGradient>
           </defs>
