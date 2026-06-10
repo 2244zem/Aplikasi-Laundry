@@ -39,6 +39,14 @@ function midtransAuthHeader() {
   return `Basic ${Buffer.from(`${midtransServerKey}:`).toString('base64')}`;
 }
 
+function midtransStatusUrl(midtransOrderId) {
+  const baseUrl = midtransIsProduction
+    ? 'https://api.midtrans.com/v2'
+    : 'https://api.sandbox.midtrans.com/v2';
+
+  return `${baseUrl}/${encodeURIComponent(midtransOrderId)}/status`;
+}
+
 function configuredMidtransKeyEnvironment() {
   return ['sandbox', 'production'].includes(midtransKeyEnvironment) ? midtransKeyEnvironment : '';
 }
@@ -438,6 +446,79 @@ async function markLaundryOrderFailed(payload) {
   }
 }
 
+function laundryPaymentStatusFromMidtrans(transactionStatus) {
+  if (['settlement', 'capture'].includes(transactionStatus)) {
+    return 'PAID';
+  }
+
+  if (transactionStatus === 'pending') {
+    return 'PENDING';
+  }
+
+  if (['expire', 'cancel', 'deny', 'failure'].includes(transactionStatus)) {
+    return 'FAILED';
+  }
+
+  return null;
+}
+
+async function fetchMidtransTransactionStatus(midtransOrderId) {
+  const response = await fetch(midtransStatusUrl(midtransOrderId), {
+    headers: {
+      Accept: 'application/json',
+      Authorization: midtransAuthHeader(),
+    },
+  });
+  const payload = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    const message = payload.status_message || payload.error_messages?.join(', ') || 'Midtrans status check failed.';
+    const error = new Error(message);
+    error.status = response.status;
+    error.payload = payload;
+    throw error;
+  }
+
+  return payload;
+}
+
+async function applyLaundryOrderPaymentStatus(order, midtransPayload) {
+  const paymentStatus = laundryPaymentStatusFromMidtrans(midtransPayload.transaction_status);
+
+  if (!paymentStatus) {
+    return {
+      order,
+      paymentStatus: order.status_pembayaran,
+      updated: false,
+    };
+  }
+
+  if (order.status_pembayaran === paymentStatus) {
+    return {
+      order,
+      paymentStatus,
+      updated: false,
+    };
+  }
+
+  const { data: updatedOrder, error } = await supabase
+    .from('tabel_order')
+    .update({ status_pembayaran: paymentStatus })
+    .eq('id', order.id)
+    .select('*')
+    .single();
+
+  if (error) {
+    throw error;
+  }
+
+  return {
+    order: updatedOrder,
+    paymentStatus,
+    updated: true,
+  };
+}
+
 app.get('/health', (_req, res) => {
   const readiness = buildMidtransReadiness();
 
@@ -574,6 +655,71 @@ app.post('/api/v1/payment/create-laundry-order-transaction', async (req, res) =>
   } catch (error) {
     console.error('Failed to create Midtrans transaction:', error);
     return res.status(500).json({ ok: false, error: 'Failed to create Midtrans transaction.' });
+  }
+});
+
+app.post('/api/v1/payment/sync-laundry-order-status', async (req, res) => {
+  const { orderId } = req.body;
+
+  if (!orderId) {
+    return res.status(400).json({ ok: false, error: 'Missing orderId.' });
+  }
+
+  try {
+    const authResult = await getRequestProfile(req);
+
+    if (authResult.error) {
+      return res.status(authResult.status).json({
+        ok: false,
+        auth_code: authResult.code,
+        error: authResult.error,
+      });
+    }
+
+    const { profile } = authResult;
+    const { data: order, error: orderError } = await supabase
+      .from('tabel_order')
+      .select('*')
+      .eq('id', orderId)
+      .maybeSingle();
+
+    if (orderError) {
+      throw orderError;
+    }
+
+    if (!order) {
+      return res.status(404).json({ ok: false, error: 'Order not found.' });
+    }
+
+    if (order.user_id !== profile.id && profile.role !== 'SUPERADMIN') {
+      return res.status(403).json({ ok: false, error: 'This order does not belong to the current user.' });
+    }
+
+    if (!order.midtrans_order_id) {
+      return res.status(400).json({ ok: false, error: 'Order belum punya transaksi Midtrans.' });
+    }
+
+    const midtransPayload = await fetchMidtransTransactionStatus(order.midtrans_order_id);
+    const result = await applyLaundryOrderPaymentStatus(order, midtransPayload);
+
+    if (result.updated) {
+      await recordPaymentEvent(midtransPayload, { userId: order.user_id, orderId: order.id });
+    }
+
+    return res.json({
+      ok: true,
+      midtrans_order_id: order.midtrans_order_id,
+      midtrans_status: midtransPayload.transaction_status ?? null,
+      order: result.order,
+      payment_status: result.paymentStatus,
+      updated: result.updated,
+    });
+  } catch (error) {
+    console.error('Failed to sync Midtrans transaction status:', error);
+    return res.status(error.status || 500).json({
+      ok: false,
+      error: error.message || 'Failed to sync Midtrans transaction status.',
+    });
   }
 });
 

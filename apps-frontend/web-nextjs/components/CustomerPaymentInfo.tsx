@@ -1,10 +1,11 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ListSkeleton } from '@/components/Skeleton';
 import { supabase } from '@/lib/supabaseClient';
 import { getValidatedAuthSession } from '@/lib/authSession';
+import { syncLaundryPaymentStatus } from '@/lib/paymentSync';
 import { isPayableOrder, paymentStatusClass, paymentStatusLabel } from '@/lib/paymentStatus';
 import type { LaundryOrder, UserProfile } from '@/lib/types';
 
@@ -128,6 +129,28 @@ export function CustomerPaymentInfo({ profile }: Props) {
     ready: 'BFF aktif',
   }[bffStatus];
 
+  const syncPendingPayments = useCallback(async (nextOrders: LaundryOrder[]) => {
+    const pendingOrders = nextOrders
+      .filter((order) => order.status_pembayaran === 'PENDING' && Boolean(order.midtrans_order_id))
+      .slice(0, 5);
+
+    for (const pendingOrder of pendingOrders) {
+      try {
+        const result = await syncLaundryPaymentStatus(pendingOrder.id);
+
+        const syncedOrder = result.order;
+
+        if (syncedOrder) {
+          setOrders((currentOrders) =>
+            currentOrders.map((order) => (order.id === syncedOrder.id ? syncedOrder : order)),
+          );
+        }
+      } catch (_error) {
+        // Webhook remains the primary path; sync is a quiet localhost fallback.
+      }
+    }
+  }, []);
+
   useEffect(() => {
     let mounted = true;
 
@@ -153,7 +176,9 @@ export function CustomerPaymentInfo({ profile }: Props) {
         return;
       }
 
-      setOrders((data ?? []) as LaundryOrder[]);
+      const nextOrders = (data ?? []) as LaundryOrder[];
+      setOrders(nextOrders);
+      void syncPendingPayments(nextOrders);
     }
 
     void loadOrders();
@@ -194,7 +219,7 @@ export function CustomerPaymentInfo({ profile }: Props) {
       mounted = false;
       void supabase.removeChannel(channel);
     };
-  }, [profile.id]);
+  }, [profile.id, syncPendingPayments]);
 
   useEffect(() => {
     let mounted = true;

@@ -1,9 +1,10 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { ListSkeleton } from '@/components/Skeleton';
+import { syncLaundryPaymentStatus } from '@/lib/paymentSync';
 import { paymentStatusClass, paymentStatusLabel } from '@/lib/paymentStatus';
 import { supabase } from '@/lib/supabaseClient';
 import type { LaundryOrder, UserProfile } from '@/lib/types';
@@ -53,7 +54,7 @@ function resultCopy(order: LaundryOrder | null) {
       icon: 'fi-rr-clock-three',
       title: 'Pembayaran pending',
       tone: 'pending',
-      body: 'Midtrans sudah membuat transaksi, tetapi webhook pembayaran belum mengirim status final.',
+      body: 'Midtrans sudah membuat transaksi. Aplikasi akan menarik status terbaru jika webhook lokal belum masuk.',
     };
   }
 
@@ -72,7 +73,24 @@ export function CustomerPaymentResult({ profile }: Props) {
   const [order, setOrder] = useState<LaundryOrder | null>(null);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState('');
+  const [syncing, setSyncing] = useState(false);
   const copy = useMemo(() => resultCopy(order), [order]);
+
+  const syncOrderStatus = useCallback(async (orderId: string) => {
+    setSyncing(true);
+
+    try {
+      const result = await syncLaundryPaymentStatus(orderId);
+
+      if (result.order) {
+        setOrder(result.order);
+      }
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Gagal sinkron status pembayaran.');
+    } finally {
+      setSyncing(false);
+    }
+  }, []);
 
   useEffect(() => {
     let mounted = true;
@@ -110,7 +128,12 @@ export function CustomerPaymentResult({ profile }: Props) {
         return;
       }
 
-      setOrder(((data ?? [])[0] ?? null) as LaundryOrder | null);
+      const nextOrder = ((data ?? [])[0] ?? null) as LaundryOrder | null;
+      setOrder(nextOrder);
+
+      if (nextOrder?.status_pembayaran === 'PENDING' && nextOrder.midtrans_order_id) {
+        void syncOrderStatus(nextOrder.id);
+      }
     }
 
     void loadOrder();
@@ -141,7 +164,7 @@ export function CustomerPaymentResult({ profile }: Props) {
       mounted = false;
       void supabase.removeChannel(channel);
     };
-  }, [laundryOrderId, midtransOrderId, profile.id]);
+  }, [laundryOrderId, midtransOrderId, profile.id, syncOrderStatus]);
 
   return (
     <div className="payment-result-screen">
@@ -199,6 +222,12 @@ export function CustomerPaymentResult({ profile }: Props) {
             <i className="fi fi-rr-credit-card" aria-hidden />
             Buka Tagihan
           </Link>
+          {order?.status_pembayaran === 'PENDING' && order.midtrans_order_id ? (
+            <button className="button secondary" disabled={syncing} onClick={() => syncOrderStatus(order.id)} type="button">
+              <i className="fi fi-rr-refresh" aria-hidden />
+              {syncing ? 'Sinkron...' : 'Sinkron Status'}
+            </button>
+          ) : null}
         </div>
       </section>
     </div>
