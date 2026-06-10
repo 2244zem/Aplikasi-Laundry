@@ -4800,3 +4800,163 @@ body {
   min-width: 0;
   overflow-wrap: anywhere;
 }
+
+/* Flat calm refinement: reduce hero/poster feel */
+.home-screen {
+  display: grid;
+  gap: 18px;
+}
+
+.home-hero,
+.home-hero.no-mockup {
+  align-items: start;
+  gap: 18px;
+  grid-template-columns: minmax(0, 0.95fr) minmax(320px, 0.72fr);
+  min-height: auto;
+}
+
+.home-copy {
+  background: #FFFFFF;
+  border: 1px solid rgba(31, 75, 93, 0.12);
+  border-radius: var(--ui-radius);
+  box-shadow: none;
+  padding: clamp(18px, 2.6vw, 30px);
+}
+
+.home-copy h1,
+.home-hero h1 {
+  font-size: clamp(30px, 3.4vw, 44px);
+  line-height: 1.08;
+  margin-bottom: 12px;
+}
+
+.home-copy .muted {
+  max-width: 640px;
+}
+
+.home-stats {
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.workflow-panel {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  gap: 10px;
+  padding: 0;
+}
+
+.workflow-header,
+.membership-card,
+.app-banner,
+.ad-card {
+  padding-left: 22px;
+}
+
+.workflow-header::before,
+.membership-card::before,
+.app-banner::before,
+.ad-card::before {
+  border-radius: 999px;
+  bottom: 14px;
+  height: auto;
+  left: 10px;
+  right: auto;
+  top: 14px;
+  width: 4px;
+}
+
+.workflow-header {
+  padding-top: 16px;
+}
+
+.workflow-card {
+  background: #FFFFFF;
+  border: 1px solid rgba(31, 75, 93, 0.12);
+  box-shadow: none;
+}
+
+.workflow-card > span,
+.nearby-media,
+.mini-store-card > span,
+.ticket-info i,
+.feature-card i,
+.empty-state i {
+  background: #EAF7F4;
+  color: var(--teal-deep);
+}
+
+.feature-card,
+.nearby-card,
+.metric-card {
+  box-shadow: none;
+}
+
+.feature-card h2 {
+  font-size: 20px;
+  margin-top: 10px;
+}
+
+.payment-card {
+  background: #1F4B5D;
+}
+
+.finance-chart-line {
+  filter: none;
+  stroke-width: 2.25;
+}
+
+.finance-chart-area {
+  opacity: 0.55;
+}
+
+.device-android .device-frame {
+  border: 1px solid rgba(31, 75, 93, 0.12);
+  border-radius: 28px;
+  box-shadow: 0 10px 24px rgba(31, 75, 93, 0.1);
+}
+
+.device-android .topbar {
+  min-height: 56px;
+}
+
+.device-android .home-hero,
+.device-android .home-hero.no-mockup {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: 1fr;
+}
+
+.device-android .home-copy {
+  padding: 14px;
+}
+
+.device-android .home-copy h1,
+.device-android .home-hero h1 {
+  font-size: 22px;
+  line-height: 1.12;
+}
+
+.device-android .workflow-header {
+  padding: 14px 14px 14px 22px;
+}
+
+.device-android .workflow-card {
+  padding: 11px;
+}
+
+.android-showcase-visual,
+.device-android .android-showcase-visual {
+  background: #FFFFFF;
+  border: 1px solid rgba(31, 75, 93, 0.12);
+  box-shadow: none;
+}
+
+.android-showcase-visual::before,
+.android-showcase-visual::after,
+.device-android .android-showcase-visual::before,
+.device-android .android-showcase-visual::after {
+  background: none;
+  opacity: 0;
+}

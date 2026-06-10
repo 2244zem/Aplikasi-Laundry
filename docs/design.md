@@ -114,6 +114,7 @@ Rules:
 - Android memakai satu kolom, padding 14-16px, bottom space cukup untuk tabbar.
 - Admin screen harus dense tetapi tidak sesak: table/list lebih penting daripada dekorasi.
 - Customer order flow harus mudah discan dari atas ke bawah: outlet -> layanan -> lokasi/alamat -> submit -> ringkasan.
+- Landing/home screen harus terasa seperti dashboard entry point, bukan poster. Hero boleh ada, tetapi rendah, compact, dan langsung menyediakan action.
 - Jangan taruh card di dalam card jika tidak perlu. Kalau markup membutuhkan nesting, inner card harus flat: shadow minimal, border lembut.
 - Gunakan grid 8px rhythm: gap 8, 14, 18, 28.
 - Jangan biarkan button, chip, select, atau heading resize layout saat hover.
@@ -159,7 +160,8 @@ Cards and Panels:
 - Card dipakai untuk item berulang, form, table surface, modal, dan tool surface.
 - Section besar jangan dibuat seperti card mengambang jika hanya pemisah halaman.
 - Inner card dalam dashboard harus flat tanpa shadow berat.
-- Promo, membership, dan ad panel memakai card putih dengan accent strip mint, bukan banner gradient.
+- Promo, membership, dan ad panel memakai card putih dengan accent strip kiri mint, bukan banner gradient.
+- Android topbar, tabbar, dan page background harus flat. Hindari device mockup dekoratif jika tidak punya fungsi langsung.
 
 Tables and Lists:
 
@@ -195,6 +197,7 @@ Don't:
 - Don't add new colors outside the palette without a semantic reason.
 - Don't make every section a floating card.
 - Don't use oversized marketing hero type inside dashboards.
+- Don't let the home hero become a poster or fake phone showcase.
 - Don't rely on color only; pair status color with text.
 - Don't use native-looking dropdowns without styling.
 - Don't use decorative radial gradients, glow blobs, glossy cards, or fake mockup panels.
