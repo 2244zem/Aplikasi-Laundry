@@ -8,6 +8,8 @@
 | Realtime database | Supabase Postgres + Realtime | Orders, users, chat, live status updates |
 | Operational cache | Redis / Upstash Redis | Payment locks, short-lived status cache, and read-pressure relief |
 | Backend-for-Frontend | Node.js Express | Midtrans webhook, server-only updates, privileged writes |
+| Go API service | Go | Health checks, operational workers, and Cassandra archive |
+| Read archive | Cassandra | Append-only archive for order events, chat, and payment events |
 | Finance service | Java Spring Boot | Scheduled monthly outlet finance aggregation |
 | Payment gateway | Midtrans Snap/Core/Subscription | Laundry order payments and admin SaaS subscriptions |
 | POS printing | Browser print, WebUSB/WebSerial, or Bluetooth bridge | Thermal receipt printing from active admin dashboard |
@@ -78,6 +80,20 @@ SPRING_DATASOURCE_PASSWORD="[YOUR-PASSWORD]"
 SCALEWASH_FINANCE_ZONE="Asia/Jakarta"
 ```
 
+Go API service `.env`:
+
+```env
+PORT="8082"
+DATABASE_URL="postgresql://postgres:[YOUR-PASSWORD]@db.nlowbwnnzyywftsseamc.supabase.co:5432/postgres"
+CASSANDRA_ENABLED="false"
+CASSANDRA_HOSTS="127.0.0.1:9042"
+CASSANDRA_KEYSPACE="ungu_laundry_archive"
+ARCHIVE_WORKER_ENABLED="true"
+ARCHIVE_POLL_INTERVAL_SECONDS="15"
+ARCHIVE_BATCH_SIZE="100"
+INTERNAL_API_TOKEN="[CHANGE-ME]"
+```
+
 Redis production example:
 
 ```env
@@ -135,14 +151,49 @@ REDIS_URL="redis://127.0.0.1:6379"
 
 Cassandra is not used as a backup/failover database for Postgres in v1. The transactional tables need relational integrity, RLS, realtime publication, and payment consistency, so Supabase Postgres remains authoritative.
 
-If event volume becomes large, Cassandra can be added later as append-only read storage for:
+The Go API service archives append-only data into Cassandra when `CASSANDRA_ENABLED=true`:
 
 - `order_events_by_order`
 - `chat_messages_by_order_archive`
-- `courier_locations_by_order_day`
 - `payment_events_by_order`
+- `archive_offsets`
 
-The future write model should keep Postgres first, then copy events asynchronously from the BFF or a worker into Cassandra. UI reads should stay on Supabase until a Cassandra read model is explicitly introduced.
+Write model:
+
+- Postgres/Supabase is written first and remains the source of truth.
+- The Go worker polls `tabel_order_event`, `tabel_chat_message`, and order-linked `tabel_payment_event` every 15 seconds by default.
+- Cassandra writes are idempotent because the primary keys include the original row ids.
+- If Cassandra is down or disabled, the app keeps using Supabase and Midtrans normally.
+- UI reads stay on Supabase until a Cassandra read endpoint is explicitly needed.
+
+Local Cassandra:
+
+```bash
+docker compose -f infra/docker-compose.yml up -d cassandra
+```
+
+Go service:
+
+```bash
+cd services-backend/go-api-service
+go mod tidy
+go run ./cmd/api
+```
+
+Health:
+
+```bash
+curl http://127.0.0.1:8082/health
+```
+
+Manual archive replay:
+
+```bash
+curl -X POST "http://127.0.0.1:8082/api/v1/archive/replay?reset=false" \
+  -H "X-Internal-Token: [CHANGE-ME]"
+```
+
+Use `reset=true` only for intentional backfill from the beginning.
 
 ## Realtime Setup
 
