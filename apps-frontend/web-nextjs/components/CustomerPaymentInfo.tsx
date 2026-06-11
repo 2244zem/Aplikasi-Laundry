@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { ListSkeleton } from '@/components/Skeleton';
+import { friendlyAppError } from '@/lib/appErrors';
 import { supabase } from '@/lib/supabaseClient';
 import { getValidatedAuthSession } from '@/lib/authSession';
 import { syncLaundryPaymentStatus } from '@/lib/paymentSync';
@@ -136,6 +137,37 @@ export function CustomerPaymentInfo({ profile }: Props) {
     && bffStatus === 'ready'
     && authChecked
     && hasPaymentSession;
+  const readinessIssue = useMemo(() => {
+    if (!process.env.NEXT_PUBLIC_BFF_BASE_URL) {
+      return 'NEXT_PUBLIC_BFF_BASE_URL belum diisi. Frontend belum tahu alamat BFF payment.';
+    }
+
+    if (bffStatus === 'offline') {
+      return 'BFF payment offline. Jalankan service backend lalu refresh halaman.';
+    }
+
+    if (authChecked && !hasPaymentSession) {
+      return 'Session payment belum valid. Login ulang sebelum membuat transaksi.';
+    }
+
+    if (midtransReadiness.keyEnvironmentVerified && !midtransReadiness.keyMatchesEnvironment) {
+      return 'Mode Midtrans dan server key tidak cocok. Samakan MIDTRANS_IS_PRODUCTION, MIDTRANS_KEY_ENV, dan dashboard key.';
+    }
+
+    if (paymentEnvironment === 'production' && !midtransReadiness.productionReady) {
+      return 'Production belum siap. Pastikan server key production dan webhook HTTPS sudah aktif.';
+    }
+
+    return '';
+  }, [
+    authChecked,
+    bffStatus,
+    hasPaymentSession,
+    midtransReadiness.keyEnvironmentVerified,
+    midtransReadiness.keyMatchesEnvironment,
+    midtransReadiness.productionReady,
+    paymentEnvironment,
+  ]);
   const bffLabel = {
     checking: 'BFF dicek',
     missing: 'BFF belum diisi',
@@ -200,7 +232,7 @@ export function CustomerPaymentInfo({ profile }: Props) {
       setLoading(false);
 
       if (error) {
-        setMessage(error.message);
+        setMessage(friendlyAppError(error, 'Gagal memuat tagihan aktif.'));
         return;
       }
 
@@ -394,7 +426,7 @@ export function CustomerPaymentInfo({ profile }: Props) {
     } catch (error) {
       setMessage(
         error instanceof Error
-          ? error.message
+          ? friendlyAppError(error)
           : 'Gagal membuka Midtrans. Coba lagi beberapa saat lagi.',
       );
     } finally {
@@ -468,6 +500,13 @@ export function CustomerPaymentInfo({ profile }: Props) {
           </div>
         ) : null}
       </section>
+
+      {readinessIssue ? (
+        <section className="alert warning payment-readiness-warning">
+          <i className="fi fi-rr-triangle-warning" aria-hidden />
+          <span>{readinessIssue}</span>
+        </section>
+      ) : null}
 
       {paymentEnvironment === 'sandbox' ? (
         <section className="alert info payment-sandbox-note">

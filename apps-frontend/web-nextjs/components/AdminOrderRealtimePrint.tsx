@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { AdminServicePricingPanel } from '@/components/AdminServicePricingPanel';
 import { InteractiveChatLaundry } from '@/components/InteractiveChatLaundry';
 import { ListSkeleton } from '@/components/Skeleton';
+import { friendlyAppError } from '@/lib/appErrors';
 import { canEditOrderCommercials, canOperateOrders, operatorOutletId } from '@/lib/access';
 import { formatCurrencyInput, parseCurrencyInput } from '@/lib/currency';
 import { isOrderPriceFinal, paymentStatusClass, paymentStatusLabel } from '@/lib/paymentStatus';
@@ -254,7 +255,7 @@ function OrderCard({ order, profile, onChange, onOpenChat }: OrderRowProps) {
     setSaving(false);
 
     if (error) {
-      setMessage(error.message);
+      setMessage(friendlyAppError(error, 'Order belum bisa diperbarui. Cek role staff dan outlet.'));
       return;
     }
 
@@ -441,7 +442,7 @@ function AdminOutletStudio({ profile }: Props) {
     setSaving(false);
 
     if (error) {
-      setMessage(error.message);
+      setMessage(friendlyAppError(error, 'Profil outlet belum bisa disimpan. Cek akun owner/admin outlet.'));
       return;
     }
 
@@ -598,7 +599,7 @@ export function AdminOrderRealtimePrint({ profile }: Props) {
     setLoading(false);
 
     if (error) {
-      setErrorMessage(error.message);
+      setErrorMessage(friendlyAppError(error, 'Gagal memuat pesanan outlet. Cek role staff dan outlet aktif.'));
       return;
     }
 

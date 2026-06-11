@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
+import { friendlyAppError } from '@/lib/appErrors';
 import { supabase } from '@/lib/supabaseClient';
 import { isCustomerPayable } from '@/lib/paymentStatus';
 import type { ChatMessage, LaundryOrder, UserProfile } from '@/lib/types';
@@ -59,7 +60,7 @@ export function InteractiveChatLaundry({ orderId, profile }: Props) {
       const { data, error } = await supabase.from('tabel_order').select('*').eq('id', orderId).maybeSingle();
 
       if (error) {
-        setErrorMessage(error.message);
+        setErrorMessage(friendlyAppError(error, 'Gagal memuat detail order chat.'));
         return;
       }
 
@@ -74,7 +75,7 @@ export function InteractiveChatLaundry({ orderId, profile }: Props) {
         .order('created_at', { ascending: true });
 
       if (error) {
-        setErrorMessage(error.message);
+        setErrorMessage(friendlyAppError(error, 'Gagal memuat riwayat chat.'));
         return;
       }
 
@@ -233,7 +234,7 @@ export function InteractiveChatLaundry({ orderId, profile }: Props) {
       setTextInput('');
       setSelectedFile(null);
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'Gagal mengirim pesan chat.');
+      setErrorMessage(friendlyAppError(error, 'Gagal mengirim pesan chat.'));
     } finally {
       setUploading(false);
     }

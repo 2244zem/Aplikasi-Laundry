@@ -2,6 +2,8 @@
 
 Checklist ini dipakai sebelum QRIS real dinyalakan. Fokusnya memastikan order flow, Midtrans sandbox, webhook, dan dashboard admin berjalan konsisten.
 
+Checklist security/realtime lengkap ada di [production-readiness-checklist.md](./production-readiness-checklist.md).
+
 ## Production Readiness
 
 - `MIDTRANS_IS_PRODUCTION=false` untuk sandbox, `true` untuk production.

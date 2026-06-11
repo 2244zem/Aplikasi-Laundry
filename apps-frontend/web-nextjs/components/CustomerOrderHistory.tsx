@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import { ListSkeleton, MetricSkeleton } from '@/components/Skeleton';
+import { friendlyAppError } from '@/lib/appErrors';
 import { isCustomerPayable, isOrderPriceFinal, paymentStatusClass, paymentStatusLabel } from '@/lib/paymentStatus';
 import { supabase } from '@/lib/supabaseClient';
 import type { LaundryOrder, UserProfile } from '@/lib/types';
@@ -113,7 +114,7 @@ export function CustomerOrderHistory({ profile }: Props) {
       setLoading(false);
 
       if (error) {
-        setMessage(error.message);
+        setMessage(friendlyAppError(error, 'Gagal memuat riwayat order.'));
         return;
       }
 

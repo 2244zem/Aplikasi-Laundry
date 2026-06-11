@@ -153,6 +153,16 @@ async function getCachedMidtransReadiness() {
   return readiness;
 }
 
+function buildPaymentGateContract() {
+  return {
+    allowed_payment_statuses: ['UNPAID', 'PENDING', 'FAILED'],
+    blocked_order_statuses: ['PENDING_CONFIRMATION', 'DIBATALKAN'],
+    min_amount_idr: 1000,
+    payable_order_statuses: ['DITERIMA', 'DICUCI', 'DISETRIKA', 'SELESAI'],
+    source_of_truth: 'public.tabel_order.status_order, status_pembayaran, total_harga',
+  };
+}
+
 function resolveRequestOrigin(req) {
   const origin = req.headers.origin;
 
@@ -545,11 +555,21 @@ async function applyLaundryOrderPaymentStatus(order, midtransPayload) {
 
 app.get('/health', async (_req, res) => {
   const readiness = await getCachedMidtransReadiness();
+  const paymentGate = buildPaymentGateContract();
+  const paymentReady = readiness.environment === 'sandbox'
+    ? readiness.key_matches_environment
+    : readiness.production_ready;
 
   res.json({
+    auth: {
+      payment_session_required: true,
+      verifier: 'Supabase Auth Bearer token via auth.getUser(token)',
+    },
     midtrans: readiness,
     midtrans_environment: readiness.environment,
     ok: true,
+    payment_gate: paymentGate,
+    payment_ready: paymentReady,
     redis: getRedisStatus(),
     service: 'scalewash-bff-service',
   });

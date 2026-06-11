@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { operatorOutletId } from '@/lib/access';
+import { friendlyAppError } from '@/lib/appErrors';
 import { formatCurrencyInput, parseCurrencyInput } from '@/lib/currency';
 import { supabase } from '@/lib/supabaseClient';
 import type { ServicePricing, UserProfile } from '@/lib/types';
@@ -64,6 +66,7 @@ export function AdminServicePricingPanel({ profile }: Props) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
+  const outletId = operatorOutletId(profile);
 
   const activeCount = useMemo(() => prices.filter((price) => price.aktif).length, [prices]);
 
@@ -74,14 +77,14 @@ export function AdminServicePricingPanel({ profile }: Props) {
     const { data, error } = await supabase
       .from('tabel_service_pricing')
       .select('*')
-      .eq('admin_id', profile.id)
+      .eq('admin_id', outletId)
       .order('urutan', { ascending: true })
       .order('created_at', { ascending: true });
 
     setLoading(false);
 
     if (error) {
-      setMessage(error.message);
+      setMessage(friendlyAppError(error, 'Gagal memuat harga layanan outlet.'));
       return;
     }
 
@@ -90,7 +93,7 @@ export function AdminServicePricingPanel({ profile }: Props) {
 
   useEffect(() => {
     void loadPricing();
-  }, [profile.id]);
+  }, [outletId]);
 
   function editPrice(price: ServicePricing) {
     setEditingId(price.id);
@@ -116,7 +119,7 @@ export function AdminServicePricingPanel({ profile }: Props) {
     setMessage('');
 
     const payload = {
-      admin_id: profile.id,
+      admin_id: outletId,
       aktif: form.aktif,
       deskripsi: form.deskripsi.trim() || null,
       estimasi_menit: form.estimasi_menit,
@@ -135,7 +138,7 @@ export function AdminServicePricingPanel({ profile }: Props) {
     setSaving(false);
 
     if (error) {
-      setMessage(error.message);
+      setMessage(friendlyAppError(error, 'Harga layanan belum bisa disimpan. Cek role owner outlet.'));
       return;
     }
 
@@ -150,12 +153,12 @@ export function AdminServicePricingPanel({ profile }: Props) {
 
     const { error } = await supabase
       .from('tabel_service_pricing')
-      .insert(starterPrices.map((price) => ({ ...price, admin_id: profile.id })));
+      .insert(starterPrices.map((price) => ({ ...price, admin_id: outletId })));
 
     setSaving(false);
 
     if (error) {
-      setMessage(error.message);
+      setMessage(friendlyAppError(error, 'Starter harga belum bisa ditambahkan. Cek role owner outlet.'));
       return;
     }
 
@@ -170,7 +173,7 @@ export function AdminServicePricingPanel({ profile }: Props) {
       .eq('id', price.id);
 
     if (error) {
-      setMessage(error.message);
+      setMessage(friendlyAppError(error, 'Status harga layanan belum bisa diubah.'));
       return;
     }
 

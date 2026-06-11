@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { canManageFinance, operatorOutletId } from '@/lib/access';
+import { friendlyAppError } from '@/lib/appErrors';
 import { supabase } from '@/lib/supabaseClient';
 import type { UserProfile } from '@/lib/types';
 
@@ -47,7 +48,7 @@ export function AdminStaffAccessPanel({ profile }: Props) {
     setLoading(false);
 
     if (error) {
-      setMessage(error.message);
+      setMessage(friendlyAppError(error, 'Gagal memuat staff outlet.'));
       return;
     }
 
@@ -77,7 +78,7 @@ export function AdminStaffAccessPanel({ profile }: Props) {
     setSaving(false);
 
     if (error || !data) {
-      setMessage(error?.message || 'User belum ditemukan. Staff harus daftar akun customer dulu.');
+      setMessage(error ? friendlyAppError(error, 'Staff belum bisa ditambahkan.') : 'User belum ditemukan. Staff harus daftar akun customer dulu.');
       return;
     }
 
@@ -101,7 +102,7 @@ export function AdminStaffAccessPanel({ profile }: Props) {
     setSaving(false);
 
     if (error) {
-      setMessage(error.message);
+      setMessage(friendlyAppError(error, 'Akses staff belum bisa dicabut.'));
       return;
     }
 

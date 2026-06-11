@@ -6,6 +6,7 @@ import { LogIn, LogOut, UserPlus } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { ListSkeleton, SkeletonBlock } from '@/components/Skeleton';
+import { friendlyAppError } from '@/lib/appErrors';
 import { supabase } from '@/lib/supabaseClient';
 import { ensureProfile } from '@/lib/profile';
 import { getValidatedAuthSession } from '@/lib/authSession';
@@ -67,7 +68,7 @@ export function AuthPanel({ children }: AuthPanelProps) {
       return '/';
     }
 
-    if (pathname.startsWith('/orders') && isAdmin) {
+    if (isAdmin && !pathname.startsWith('/admin')) {
       return '/admin/dashboard';
     }
 
@@ -106,13 +107,17 @@ export function AuthPanel({ children }: AuthPanelProps) {
           const nextProfile = await ensureProfile(user);
           if (mounted) {
             setProfile(nextProfile);
+            const nextRoute = routeAfterAuth(nextProfile);
+            if (nextRoute) {
+              router.replace(withCurrentContext(nextRoute));
+            }
           }
         } else if (errorMessage) {
           setMessage(errorMessage);
         }
       } catch (error) {
         if (mounted) {
-          setMessage(error instanceof Error ? error.message : 'Gagal membaca sesi Supabase.');
+          setMessage(friendlyAppError(error, 'Gagal membaca sesi Supabase.'));
         }
       } finally {
         if (mounted) {
@@ -169,7 +174,7 @@ export function AuthPanel({ children }: AuthPanelProps) {
         setMessage('Cek email untuk konfirmasi akun Supabase Auth.');
       }
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Autentikasi gagal.');
+      setMessage(friendlyAppError(error, 'Autentikasi gagal.'));
     } finally {
       setLoading(false);
     }
@@ -177,6 +182,7 @@ export function AuthPanel({ children }: AuthPanelProps) {
 
   async function handleSignOut() {
     setLoading(true);
+    setMessage('');
     await supabase.auth.signOut();
     setSession(null);
     setProfile(null);

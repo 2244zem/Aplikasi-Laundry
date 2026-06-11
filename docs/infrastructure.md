@@ -92,6 +92,7 @@ Important security boundary:
 - `SUPABASE_SERVICE_ROLE_KEY` must only exist on the backend. It bypasses Row Level Security and is required for webhook-driven role/subscription changes.
 - `MIDTRANS_SERVER_KEY` must only exist on the backend. It is used to verify Midtrans notification authenticity.
 - `REDIS_URL` must only exist on backend services. The browser never connects directly to Redis.
+- `tabel_payment_event` is intentionally backend-only for clients. The BFF records payment events with the service role after Midtrans signature verification.
 
 ## Redis Cache and Locking
 
@@ -104,6 +105,12 @@ The BFF uses Redis for:
 - `sync-payment:{orderId}` lock so repeated status checks do not hammer Midtrans.
 - `create-payment:{orderId}` lock so double-clicks do not create parallel transactions.
 - Cached Midtrans Snap redirect payload for a pending order when available.
+
+The `/health` endpoint also reports:
+
+- `auth.payment_session_required`: payment endpoints require a Supabase Bearer token.
+- `payment_ready`: true when the current Midtrans mode/key can be used.
+- `payment_gate`: shared payment rules, including blocked order statuses and minimum amount.
 
 Failure behavior:
 

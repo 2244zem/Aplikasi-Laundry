@@ -855,6 +855,15 @@ h3 {
   color: var(--plum-900);
 }
 
+.alert.warning {
+  align-items: flex-start;
+  background: #fff8e8;
+  border: 1px solid #f2d58a;
+  color: #7a4c00;
+  display: flex;
+  gap: 8px;
+}
+
 @keyframes icon-pop {
   0% {
     transform: scale(1);

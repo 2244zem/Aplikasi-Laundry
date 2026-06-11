@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import { ListSkeleton } from '@/components/Skeleton';
+import { friendlyAppError } from '@/lib/appErrors';
 import { supabase } from '@/lib/supabaseClient';
 import type { LaundryOrder, ServicePricing, UserProfile } from '@/lib/types';
 
@@ -285,7 +286,7 @@ export function CustomerOrderForm({ profile }: Props) {
       setLoadingOutlets(false);
 
       if (error) {
-        setMessage(error.message);
+        setMessage(friendlyAppError(error, 'Gagal memuat daftar outlet aktif.'));
         return;
       }
 
@@ -329,7 +330,7 @@ export function CustomerOrderForm({ profile }: Props) {
       setLoadingPrices(false);
 
       if (error) {
-        setMessage(error.message);
+        setMessage(friendlyAppError(error, 'Gagal memuat harga layanan outlet.'));
         setServicePrices(fallbackServicePrices);
         setSelectedServiceId(fallbackServicePrices[0].id);
         return;
@@ -371,7 +372,7 @@ export function CustomerOrderForm({ profile }: Props) {
       setOrdersLoading(false);
 
       if (error) {
-        setMessage(error.message);
+        setMessage(friendlyAppError(error, 'Gagal memuat order aktif.'));
         return;
       }
 
@@ -531,7 +532,7 @@ export function CustomerOrderForm({ profile }: Props) {
     setSubmitting(false);
 
     if (error) {
-      setMessage(error.message);
+      setMessage(friendlyAppError(error, 'Order belum bisa dikirim. Cek sesi login dan outlet tujuan.'));
       return;
     }
 
@@ -547,7 +548,7 @@ export function CustomerOrderForm({ profile }: Props) {
     setActiveOrders((currentOrders) => upsertOrderList(currentOrders, nextOrder));
     setMessage(
       chatError
-        ? `Order terkirim ke ${outletName(selectedOutlet)}, tetapi pesan awal chat gagal dibuat: ${chatError.message}`
+        ? `Order terkirim ke ${outletName(selectedOutlet)}, tetapi pesan awal chat gagal dibuat: ${friendlyAppError(chatError)}`
         : `Order terkirim ke ${outletName(selectedOutlet)} dan chat awal sudah dibuat.`,
     );
     setAlamat('');

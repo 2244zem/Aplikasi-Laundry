@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { ListSkeleton } from '@/components/Skeleton';
+import { friendlyAppError } from '@/lib/appErrors';
 import { syncLaundryPaymentStatus } from '@/lib/paymentSync';
 import { paymentStatusClass, paymentStatusLabel } from '@/lib/paymentStatus';
 import { supabase } from '@/lib/supabaseClient';
@@ -100,7 +101,7 @@ export function CustomerPaymentResult({ profile }: Props) {
         setOrder(result.order);
       }
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Gagal sinkron status pembayaran.');
+      setMessage(friendlyAppError(error, 'Gagal sinkron status pembayaran.'));
     } finally {
       setSyncing(false);
     }
@@ -138,7 +139,7 @@ export function CustomerPaymentResult({ profile }: Props) {
       setLoading(false);
 
       if (error) {
-        setMessage(error.message);
+        setMessage(friendlyAppError(error, 'Gagal membaca hasil pembayaran.'));
         return;
       }
 
