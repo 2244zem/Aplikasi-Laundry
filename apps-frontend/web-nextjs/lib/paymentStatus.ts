@@ -38,10 +38,17 @@ export function paymentStatusLabel(status: PaymentStatus) {
   return 'UNPAID';
 }
 
-export function isPayableOrder(order: LaundryOrder) {
-  return (order.status_pembayaran === 'UNPAID'
-      || order.status_pembayaran === 'PENDING'
-      || order.status_pembayaran === 'FAILED')
+export function isOrderPriceFinal(order: LaundryOrder) {
+  return order.status_order !== 'PENDING_CONFIRMATION'
     && order.status_order !== 'DIBATALKAN'
     && Number(order.total_harga || 0) >= 1000;
 }
+
+export function isCustomerPayable(order: LaundryOrder) {
+  return (order.status_pembayaran === 'UNPAID'
+      || order.status_pembayaran === 'PENDING'
+      || order.status_pembayaran === 'FAILED')
+    && isOrderPriceFinal(order);
+}
+
+export const isPayableOrder = isCustomerPayable;

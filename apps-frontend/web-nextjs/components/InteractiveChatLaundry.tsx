@@ -5,6 +5,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
+import { isCustomerPayable } from '@/lib/paymentStatus';
 import type { ChatMessage, LaundryOrder, UserProfile } from '@/lib/types';
 
 const CHAT_BUCKET = 'bukti-cucian';
@@ -275,7 +276,7 @@ export function InteractiveChatLaundry({ orderId, profile }: Props) {
             <i className="fi fi-rr-ballot" aria-hidden />
             Riwayat
           </Link>
-          {profile.role === 'USER' && order?.status_pembayaran !== 'PAID' && Number(order?.total_harga || 0) >= 1000 ? (
+          {profile.role === 'USER' && order && isCustomerPayable(order) ? (
             <Link className="button primary" href={withCurrentContext('/orders/payment')}>
               <i className="fi fi-rr-credit-card" aria-hidden />
               Bayar

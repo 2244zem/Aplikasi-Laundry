@@ -45,15 +45,16 @@ BFF Service
 2. Frontend inserts a row into `tabel_order` with `status_order = 'PENDING_CONFIRMATION'` and `status_pembayaran = 'UNPAID'`.
 3. Active admin dashboard listens to Supabase Realtime `INSERT` events on `tabel_order`.
 4. When an order arrives, the dashboard generates a receipt and triggers the thermal printer.
-5. Admin receives physical laundry, weighs it, inputs `berat_kg`, calculates `total_harga`, and updates status to `DICUCI`.
-6. Customer sees status changes in real time: `PENDING_CONFIRMATION -> DITERIMA -> DICUCI -> DISETRIKA -> SELESAI`.
-7. Chat messages between customer and admin use Supabase Realtime Broadcast or database-backed realtime messages.
+5. Admin reviews the order, confirms it by changing status from `PENDING_CONFIRMATION` to at least `DITERIMA`, and finalizes `berat_kg` / `total_harga`.
+6. Customer can only start laundry payment after the order is confirmed by admin and `total_harga >= 1000`.
+7. Customer sees status changes in real time: `PENDING_CONFIRMATION -> DITERIMA -> DICUCI -> DISETRIKA -> SELESAI`.
+8. Chat messages between customer and admin use Supabase Realtime Broadcast or database-backed realtime messages.
 
 ## 5. Payment Workflow
 
 ### Customer Laundry Payment
 
-1. Customer starts checkout through Midtrans Snap or Core API.
+1. Customer starts checkout through Midtrans Snap or Core API after admin confirmation.
 2. Midtrans processes QRIS, GoPay, ShopeePay, bank transfer, or supported channels.
 3. Midtrans sends HTTP notification to the BFF webhook.
 4. BFF verifies `signature_key`.

@@ -607,8 +607,22 @@ app.post('/api/v1/payment/create-laundry-order-transaction', async (req, res) =>
       return res.status(409).json({ ok: false, error: 'Order sudah dibatalkan dan tidak bisa dibayar.' });
     }
 
+    if (order.status_order === 'PENDING_CONFIRMATION') {
+      return res.status(409).json({
+        ok: false,
+        error: 'Order masih menunggu konfirmasi admin. Admin wajib menerima order dan memfinalkan harga sebelum customer bisa membayar.',
+      });
+    }
+
     if (order.status_pembayaran === 'PAID') {
       return res.status(409).json({ ok: false, error: 'Order ini sudah lunas.' });
+    }
+
+    if (!['UNPAID', 'PENDING', 'FAILED'].includes(order.status_pembayaran)) {
+      return res.status(409).json({
+        ok: false,
+        error: `Status pembayaran ${order.status_pembayaran} tidak bisa dibuatkan transaksi baru.`,
+      });
     }
 
     const amount = Number(order.total_harga || 0);

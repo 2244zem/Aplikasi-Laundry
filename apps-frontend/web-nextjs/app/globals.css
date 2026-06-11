@@ -5669,3 +5669,34 @@ body {
 .device-android .order-side {
   gap: 12px;
 }
+
+/* Admin payment finalization polish */
+.ticket-edit label {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.ticket-edit label span {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.ticket-edit label .input {
+  min-width: 0;
+  width: 100%;
+}
+
+.payment-filter-control {
+  overflow-x: auto;
+}
+
+.admin-order-tools {
+  flex-wrap: wrap;
+}
+
+.device-android .ticket-edit {
+  grid-template-columns: 1fr;
+}

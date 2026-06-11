@@ -7,7 +7,7 @@ import { ListSkeleton } from '@/components/Skeleton';
 import { supabase } from '@/lib/supabaseClient';
 import { getValidatedAuthSession } from '@/lib/authSession';
 import { syncLaundryPaymentStatus } from '@/lib/paymentSync';
-import { isPayableOrder, paymentStatusClass, paymentStatusLabel } from '@/lib/paymentStatus';
+import { isCustomerPayable, isOrderPriceFinal, paymentStatusClass, paymentStatusLabel } from '@/lib/paymentStatus';
 import type { LaundryOrder, UserProfile } from '@/lib/types';
 
 type Props = {
@@ -62,6 +62,10 @@ function readPaymentError(payload: unknown, status: number) {
 }
 
 function paymentActionLabel(order: LaundryOrder) {
+  if (order.status_order === 'PENDING_CONFIRMATION') {
+    return 'Menunggu Konfirmasi';
+  }
+
   if (Number(order.total_harga || 0) < 1000) {
     return 'Menunggu Harga';
   }
@@ -117,11 +121,11 @@ export function CustomerPaymentInfo({ profile }: Props) {
     [orders],
   );
   const billableOrders = useMemo(
-    () => unpaidOrders.filter((order) => Number(order.total_harga || 0) >= 1000),
+    () => unpaidOrders.filter(isCustomerPayable),
     [unpaidOrders],
   );
   const pendingPriceOrders = useMemo(
-    () => unpaidOrders.filter((order) => Number(order.total_harga || 0) < 1000),
+    () => unpaidOrders.filter((order) => !isCustomerPayable(order)),
     [unpaidOrders],
   );
   const unpaidTotal = useMemo(
@@ -507,7 +511,7 @@ export function CustomerPaymentInfo({ profile }: Props) {
           ) : null}
 
           {billableOrders.map((order) => {
-            const canPayOrder = isPayableOrder(order);
+            const canPayOrder = isCustomerPayable(order);
 
             return (
               <article className="bill-card" key={order.id}>
@@ -545,7 +549,7 @@ export function CustomerPaymentInfo({ profile }: Props) {
 
           {pendingPriceOrders.length > 0 ? (
             <div className="pending-price-list" aria-label="Order menunggu harga final">
-              <p className="eyebrow">Menunggu harga final</p>
+              <p className="eyebrow">Menunggu konfirmasi admin</p>
               {pendingPriceOrders.map((order) => (
                 <article className="bill-card muted" key={order.id}>
                   <div>
@@ -555,7 +559,13 @@ export function CustomerPaymentInfo({ profile }: Props) {
                       {paymentStatusLabel(order.status_pembayaran)}
                     </span>
                   </div>
-                  <strong>Harga belum final</strong>
+                  <strong>
+                    {order.status_order === 'PENDING_CONFIRMATION'
+                      ? 'Belum dikonfirmasi'
+                      : !isOrderPriceFinal(order)
+                        ? 'Harga belum final'
+                        : `Status ${paymentStatusLabel(order.status_pembayaran)}`}
+                  </strong>
                   <button className="button secondary" disabled type="button">
                     <i className="fi fi-rr-clock-three" aria-hidden />
                     Menunggu Admin

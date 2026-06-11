@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import { ListSkeleton, MetricSkeleton } from '@/components/Skeleton';
-import { paymentStatusClass, paymentStatusLabel } from '@/lib/paymentStatus';
+import { isCustomerPayable, isOrderPriceFinal, paymentStatusClass, paymentStatusLabel } from '@/lib/paymentStatus';
 import { supabase } from '@/lib/supabaseClient';
 import type { LaundryOrder, UserProfile } from '@/lib/types';
 
@@ -291,16 +291,16 @@ export function CustomerOrderHistory({ profile }: Props) {
                     <i className="fi fi-rr-comment-alt" aria-hidden />
                     Chat & Status
                   </Link>
-                  {order.status_pembayaran !== 'PAID' && Number(order.total_harga || 0) >= 1000 ? (
+                  {isCustomerPayable(order) ? (
                     <Link className="button primary" href={withCurrentContext('/orders/payment')}>
                       <i className="fi fi-rr-credit-card" aria-hidden />
                       Bayar
                     </Link>
                   ) : null}
-                  {order.status_pembayaran !== 'PAID' && Number(order.total_harga || 0) < 1000 ? (
+                  {order.status_pembayaran !== 'PAID' && !isOrderPriceFinal(order) ? (
                     <button className="button secondary" disabled type="button">
                       <i className="fi fi-rr-clock-three" aria-hidden />
-                      Menunggu harga
+                      Menunggu konfirmasi
                     </button>
                   ) : null}
                 </div>

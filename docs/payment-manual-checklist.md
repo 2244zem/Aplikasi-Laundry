@@ -42,18 +42,20 @@ QRIS sandbox tidak bisa discan memakai GoPay, OVO, DANA, atau mobile banking asl
 
 1. Login sebagai user.
 2. Buat order.
-3. Login sebagai admin outlet yang dipilih.
-4. Isi `Berat kg` dan `Total harga` minimal Rp 1.000.
-5. Simpan order.
-6. Kembali sebagai user, buka `Bayar`.
-7. Klik `Bayar Sekarang`.
-8. Di halaman Snap Midtrans, pilih QRIS.
-9. Salin URL gambar QR dari halaman Snap.
-10. Buka `https://simulator.sandbox.midtrans.com/qris/index`.
-11. Paste URL gambar QR.
-12. Klik scan/pay di simulator.
-13. Tunggu webhook mengubah status menjadi `PAID`.
-14. Buka `Riwayat` dan `Dashboard Admin` untuk memastikan status realtime berubah.
+3. Buka halaman `Bayar` sebagai user dan pastikan order tampil sebagai `Menunggu konfirmasi admin`; tombol bayar belum aktif.
+4. Login sebagai admin outlet yang dipilih.
+5. Isi `Berat kg` dan `Total harga` minimal Rp 1.000.
+6. Ubah status order dari `PENDING` ke `DITERIMA`, lalu simpan.
+7. Kembali sebagai user, buka `Bayar`.
+8. Pastikan order berubah realtime menjadi siap dibayar.
+9. Klik `Bayar Sekarang`.
+10. Di halaman Snap Midtrans, pilih QRIS.
+11. Salin URL gambar QR dari halaman Snap.
+12. Buka `https://simulator.sandbox.midtrans.com/qris/index`.
+13. Paste URL gambar QR.
+14. Klik scan/pay di simulator.
+15. Tunggu webhook mengubah status menjadi `PAID`.
+16. Buka `Riwayat`, `Dashboard Admin`, dan `Finance` untuk memastikan status/pendapatan realtime berubah.
 
 ## Common Sandbox Failure
 
@@ -61,18 +63,22 @@ QRIS sandbox tidak bisa discan memakai GoPay, OVO, DANA, atau mobile banking asl
 - `Unsuccessful` di simulator: biasanya URL QR yang ditempel bukan URL gambar QR, order sudah expired, atau amount tidak valid.
 - Status tidak berubah realtime: webhook localhost tidak bisa dijangkau Midtrans. Pakai HTTPS tunnel seperti ngrok/cloudflared, lalu isi `MIDTRANS_WEBHOOK_URL`.
 - Tombol bayar tidak aktif: admin belum mengisi `total_harga` final minimal Rp 1.000.
+- Tombol bayar tetap tidak aktif walau ada estimasi harga: normal jika order masih `PENDING_CONFIRMATION`; admin harus mengubah status minimal ke `DITERIMA`.
 - `INVALID_SESSION`: login ulang, karena token Supabase lokal sudah expired/rusak.
 
 ## End-to-End Checklist
 
 - User login.
 - User buat order dan memilih outlet.
+- User melihat order baru sebagai `Menunggu konfirmasi admin`.
 - Admin outlet yang benar menerima order.
-- Admin isi harga final.
+- Admin isi harga final dan mengubah status minimal ke `DITERIMA`.
+- User melihat tombol bayar aktif tanpa refresh.
 - User bayar memakai Midtrans sandbox simulator.
 - Webhook mengubah pembayaran ke `PAID`, atau `FAILED` jika transaksi gagal.
 - User melihat result page setelah kembali dari Midtrans.
 - User melihat status realtime di Riwayat.
 - Admin melihat badge `UNPAID`, `PENDING`, `PAID`, atau `FAILED`.
+- Admin filter `Menunggu konfirmasi`, `UNPAID`, `PENDING`, `PAID`, atau `FAILED`.
 - Admin filter `Belum lunas`.
-- Admin finance ikut menampilkan pendapatan setelah order paid/selesai sesuai aturan finance yang dipakai.
+- Admin finance hanya menampilkan pendapatan dari order `PAID`.

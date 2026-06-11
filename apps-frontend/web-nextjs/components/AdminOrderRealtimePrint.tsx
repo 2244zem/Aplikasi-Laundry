@@ -7,7 +7,7 @@ import { InteractiveChatLaundry } from '@/components/InteractiveChatLaundry';
 import { ListSkeleton } from '@/components/Skeleton';
 import { canEditOrderCommercials, canOperateOrders, operatorOutletId } from '@/lib/access';
 import { formatCurrencyInput, parseCurrencyInput } from '@/lib/currency';
-import { paymentStatusClass, paymentStatusLabel } from '@/lib/paymentStatus';
+import { isOrderPriceFinal, paymentStatusClass, paymentStatusLabel } from '@/lib/paymentStatus';
 import { supabase } from '@/lib/supabaseClient';
 import type { LaundryOrder, UserProfile } from '@/lib/types';
 
@@ -24,7 +24,7 @@ type Props = {
   profile: UserProfile;
 };
 
-type AdminPaymentFilter = 'ALL' | 'UNPAID' | 'PENDING' | 'PAID' | 'FAILED';
+type AdminPaymentFilter = 'ALL' | 'WAITING_CONFIRMATION' | 'UNPAID' | 'PENDING' | 'PAID' | 'FAILED';
 
 function escapeHtml(value: unknown) {
   return String(value ?? '')
@@ -37,7 +37,8 @@ function escapeHtml(value: unknown) {
 
 function buildReceiptHtml(order: LaundryOrder) {
   const detail = order.format_detail ?? {};
-  const orderTotal = Number(order.total_harga || detail.estimasi_harga || 0);
+  const customerEstimate = Number(detail.estimasi_harga || 0);
+  const finalTotal = isOrderPriceFinal(order) ? Number(order.total_harga || 0) : 0;
   const outletName = detail.outlet_name || 'UNGU LAUNDRY';
   const outletAddress = detail.outlet_address || '-';
 
@@ -110,7 +111,8 @@ function buildReceiptHtml(order: LaundryOrder) {
         <div class="line"></div>
         <p>Status: ${escapeHtml(order.status_order)}</p>
         <p>Pembayaran: ${escapeHtml(order.status_pembayaran)}</p>
-        <p>Total: ${escapeHtml(formatCurrency(orderTotal))}</p>
+        <p>Estimasi customer: ${escapeHtml(customerEstimate >= 1000 ? formatCurrency(customerEstimate) : '-')}</p>
+        <p>Total final: ${escapeHtml(finalTotal >= 1000 ? formatCurrency(finalTotal) : 'MENUNGGU KONFIRMASI')}</p>
         <div class="line"></div>
         <h2>KETENTUAN</h2>
         <ol class="small">
@@ -174,11 +176,31 @@ function matchesPaymentFilter(order: LaundryOrder, filter: AdminPaymentFilter) {
     return true;
   }
 
+  if (filter === 'WAITING_CONFIRMATION') {
+    return order.status_order === 'PENDING_CONFIRMATION';
+  }
+
   if (filter === 'UNPAID') {
-    return order.status_pembayaran !== 'PAID';
+    return order.status_order !== 'PENDING_CONFIRMATION' && order.status_pembayaran === 'UNPAID';
   }
 
   return order.status_pembayaran === filter;
+}
+
+function adminPaymentFilterLabel(filter: AdminPaymentFilter) {
+  if (filter === 'ALL') {
+    return 'Semua';
+  }
+
+  if (filter === 'WAITING_CONFIRMATION') {
+    return 'Menunggu konfirmasi';
+  }
+
+  if (filter === 'UNPAID') {
+    return 'UNPAID';
+  }
+
+  return filter;
 }
 
 type OrderRowProps = {
@@ -199,6 +221,9 @@ function OrderCard({ order, profile, onChange, onOpenChat }: OrderRowProps) {
   const canEdit = order.admin_outlet_id === outletId || profile.role === 'SUPERADMIN';
   const canEditCommercials = canEdit && canEditOrderCommercials(profile);
   const statusIndex = Math.max(0, statusOptions.indexOf(order.status_order));
+  const customerEstimate = Number(detail.estimasi_harga || 0);
+  const isFinalStatus = statusOrder !== 'PENDING_CONFIRMATION' && statusOrder !== 'DIBATALKAN';
+  const hasValidFinalPrice = Number(totalHarga || 0) >= 1000;
 
   useEffect(() => {
     setBeratKg(Number(order.berat_kg ?? 0));
@@ -207,6 +232,11 @@ function OrderCard({ order, profile, onChange, onOpenChat }: OrderRowProps) {
   }, [order.berat_kg, order.id, order.status_order, order.total_harga]);
 
   async function saveOrder() {
+    if (isFinalStatus && !hasValidFinalPrice) {
+      setMessage('Isi harga final minimal Rp 1.000 sebelum menerima atau memproses order.');
+      return;
+    }
+
     setSaving(true);
     setMessage('');
 
@@ -262,6 +292,10 @@ function OrderCard({ order, profile, onChange, onOpenChat }: OrderRowProps) {
             <i className="fi fi-rr-clock-three" aria-hidden />
             {detail.pickup_time || 'Pickup fleksibel'}
           </span>
+          <span>
+            <i className="fi fi-rr-wallet" aria-hidden />
+            Estimasi customer: {customerEstimate >= 1000 ? formatCurrency(customerEstimate) : '-'}
+          </span>
         </div>
 
         <div className="status-rail" aria-label="Progress order">
@@ -273,29 +307,35 @@ function OrderCard({ order, profile, onChange, onOpenChat }: OrderRowProps) {
         </div>
 
         <div className="ticket-edit">
-          <input
-            className="input"
-            disabled={!canEditCommercials}
-            min={0}
-            onChange={(event) => setBeratKg(Number(event.target.value))}
-            step="0.1"
-            title="Berat kg"
-            type="number"
-            value={beratKg}
-          />
-          <input
-            className="input"
-            disabled={!canEditCommercials}
-            inputMode="numeric"
-            onChange={(event) => setTotalHarga(parseCurrencyInput(event.target.value))}
-            placeholder="100.000"
-            title="Total harga"
-            type="text"
-            value={formatCurrencyInput(totalHarga)}
-          />
-          <strong>{Number(totalHarga || 0) >= 1000 ? formatCurrency(totalHarga) : 'Harga belum final'}</strong>
+          <label>
+            <span>Berat final</span>
+            <input
+              className="input"
+              disabled={!canEditCommercials}
+              min={0}
+              onChange={(event) => setBeratKg(Number(event.target.value))}
+              step="0.1"
+              title="Berat kg"
+              type="number"
+              value={beratKg}
+            />
+          </label>
+          <label>
+            <span>Harga final admin</span>
+            <input
+              className="input"
+              disabled={!canEditCommercials}
+              inputMode="numeric"
+              onChange={(event) => setTotalHarga(parseCurrencyInput(event.target.value))}
+              placeholder="100.000"
+              title="Total harga"
+              type="text"
+              value={formatCurrencyInput(totalHarga)}
+            />
+          </label>
+          <strong>{hasValidFinalPrice ? formatCurrency(totalHarga) : 'Harga belum final'}</strong>
         </div>
-        {Number(totalHarga || 0) < 1000 ? (
+        {!hasValidFinalPrice ? (
           <div className="alert info ticket-price-alert">
             Isi harga final minimal Rp 1.000 sebelum customer bisa membayar Midtrans.
           </div>
@@ -536,7 +576,8 @@ export function AdminOrderRealtimePrint({ profile }: Props) {
   const isActiveAdmin = canOperateOrders(profile);
   const outletId = operatorOutletId(profile);
   const visibleOrders = orders.filter((order) => matchesPaymentFilter(order, paymentFilter));
-  const unpaidCount = orders.filter((order) => order.status_pembayaran !== 'PAID').length;
+  const waitingConfirmationCount = orders.filter((order) => order.status_order === 'PENDING_CONFIRMATION').length;
+  const unpaidCount = orders.filter((order) => order.status_order !== 'PENDING_CONFIRMATION' && order.status_pembayaran !== 'PAID').length;
 
   async function loadOrders() {
     setLoading(true);
@@ -699,13 +740,14 @@ export function AdminOrderRealtimePrint({ profile }: Props) {
             <h2>Pesanan masuk ke outlet kamu</h2>
           </div>
           <div className="admin-order-tools">
+            <span className="status pending">{waitingConfirmationCount} menunggu konfirmasi</span>
             <span className="status pending">{unpaidCount} belum lunas</span>
             <span className="status active">{orders.length} order</span>
           </div>
         </div>
 
         <div className="segmented-control payment-filter-control" role="tablist" aria-label="Filter status pembayaran">
-          {(['ALL', 'UNPAID', 'PENDING', 'PAID', 'FAILED'] as AdminPaymentFilter[]).map((filter) => (
+          {(['ALL', 'WAITING_CONFIRMATION', 'UNPAID', 'PENDING', 'PAID', 'FAILED'] as AdminPaymentFilter[]).map((filter) => (
             <button
               aria-selected={paymentFilter === filter}
               className={paymentFilter === filter ? 'active' : ''}
@@ -713,7 +755,7 @@ export function AdminOrderRealtimePrint({ profile }: Props) {
               onClick={() => setPaymentFilter(filter)}
               type="button"
             >
-              {filter === 'ALL' ? 'Semua' : filter === 'UNPAID' ? 'Belum lunas' : filter}
+              {adminPaymentFilterLabel(filter)}
             </button>
           ))}
         </div>
