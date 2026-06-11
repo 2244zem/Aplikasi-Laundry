@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
+import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
 import type { ChatMessage, LaundryOrder, UserProfile } from '@/lib/types';
 
@@ -31,6 +33,7 @@ function orderStatusLabel(status: LaundryOrder['status_order']) {
 }
 
 export function InteractiveChatLaundry({ orderId, profile }: Props) {
+  const searchParams = useSearchParams();
   const [order, setOrder] = useState<LaundryOrder | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [textInput, setTextInput] = useState('');
@@ -135,6 +138,20 @@ export function InteractiveChatLaundry({ orderId, profile }: Props) {
     logRef.current?.scrollTo({ top: logRef.current.scrollHeight, behavior: 'smooth' });
   }, [messages.length]);
 
+  function withCurrentContext(href: string) {
+    const [path, query = ''] = href.split('?');
+    const params = new URLSearchParams(query);
+
+    ['isandroid', 'istablet', 'isdesktop', 'lang'].forEach((key) => {
+      if (searchParams.has(key) && !params.has(key)) {
+        params.set(key, searchParams.get(key) ?? '');
+      }
+    });
+
+    const nextQuery = params.toString();
+    return `${path}${nextQuery ? `?${nextQuery}` : ''}`;
+  }
+
   function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0] ?? null;
     setErrorMessage('');
@@ -222,7 +239,7 @@ export function InteractiveChatLaundry({ orderId, profile }: Props) {
   }
 
   return (
-    <section className="chat-screen">
+    <section className={`chat-screen ${profile.role === 'USER' ? 'customer-chat-screen' : 'admin-chat-screen'}`}>
       <div className="chat-status-card">
         <div className="section-heading compact">
           <div>
@@ -237,17 +254,33 @@ export function InteractiveChatLaundry({ orderId, profile }: Props) {
           </span>
         </div>
 
-        <div className="status-rail large" aria-label="Progress order customer">
+        <div className="customer-timeline compact chat-timeline" aria-label="Progress order customer">
           {orderSteps.map((status) => {
             const currentIndex = order ? orderSteps.indexOf(order.status_order) : -1;
             const stepIndex = orderSteps.indexOf(status);
 
             return (
-              <span className={stepIndex <= currentIndex ? 'active' : ''} key={status}>
-                {orderStatusLabel(status)}
-              </span>
+              <div className={stepIndex <= currentIndex ? 'active' : ''} key={status}>
+                <span>
+                  <i className={stepIndex <= currentIndex ? 'fi fi-rr-check' : 'fi fi-rr-circle'} aria-hidden />
+                </span>
+                <p>{orderStatusLabel(status)}</p>
+              </div>
             );
           })}
+        </div>
+
+        <div className="actions">
+          <Link className="button secondary" href={withCurrentContext('/orders/history')}>
+            <i className="fi fi-rr-ballot" aria-hidden />
+            Riwayat
+          </Link>
+          {profile.role === 'USER' && order?.status_pembayaran !== 'PAID' && Number(order?.total_harga || 0) >= 1000 ? (
+            <Link className="button primary" href={withCurrentContext('/orders/payment')}>
+              <i className="fi fi-rr-credit-card" aria-hidden />
+              Bayar
+            </Link>
+          ) : null}
         </div>
       </div>
 

@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { ListSkeleton } from '@/components/Skeleton';
 import { supabase } from '@/lib/supabaseClient';
 import { getValidatedAuthSession } from '@/lib/authSession';
@@ -89,6 +90,7 @@ function paymentActionLabel(order: LaundryOrder) {
 }
 
 export function CustomerPaymentInfo({ profile }: Props) {
+  const searchParams = useSearchParams();
   const [orders, setOrders] = useState<LaundryOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [payingOrderId, setPayingOrderId] = useState('');
@@ -114,9 +116,17 @@ export function CustomerPaymentInfo({ profile }: Props) {
     () => orders.filter((order) => order.status_pembayaran !== 'PAID' && order.status_order !== 'DIBATALKAN'),
     [orders],
   );
-  const unpaidTotal = useMemo(
-    () => unpaidOrders.reduce((sum, order) => sum + Number(order.total_harga || 0), 0),
+  const billableOrders = useMemo(
+    () => unpaidOrders.filter((order) => Number(order.total_harga || 0) >= 1000),
     [unpaidOrders],
+  );
+  const pendingPriceOrders = useMemo(
+    () => unpaidOrders.filter((order) => Number(order.total_harga || 0) < 1000),
+    [unpaidOrders],
+  );
+  const unpaidTotal = useMemo(
+    () => billableOrders.reduce((sum, order) => sum + Number(order.total_harga || 0), 0),
+    [billableOrders],
   );
   const paymentReady = Boolean(process.env.NEXT_PUBLIC_BFF_BASE_URL)
     && bffStatus === 'ready'
@@ -128,6 +138,20 @@ export function CustomerPaymentInfo({ profile }: Props) {
     offline: 'BFF offline',
     ready: 'BFF aktif',
   }[bffStatus];
+
+  function withCurrentContext(href: string) {
+    const [path, query = ''] = href.split('?');
+    const params = new URLSearchParams(query);
+
+    ['isandroid', 'istablet', 'isdesktop', 'lang'].forEach((key) => {
+      if (searchParams.has(key) && !params.has(key)) {
+        params.set(key, searchParams.get(key) ?? '');
+      }
+    });
+
+    const nextQuery = params.toString();
+    return `${path}${nextQuery ? `?${nextQuery}` : ''}`;
+  }
 
   const syncPendingPayments = useCallback(async (nextOrders: LaundryOrder[]) => {
     const pendingOrders = nextOrders
@@ -401,7 +425,7 @@ export function CustomerPaymentInfo({ profile }: Props) {
               </span>
             </div>
           </div>
-          <span className="status pending">{unpaidOrders.length} belum lunas</span>
+          <span className="status pending">{billableOrders.length} siap bayar</span>
         </div>
       </section>
 
@@ -464,7 +488,7 @@ export function CustomerPaymentInfo({ profile }: Props) {
             <h2>{formatCurrency(unpaidTotal)}</h2>
             <p className="muted">Total dari order yang belum lunas.</p>
           </div>
-          <Link className="button secondary" href="/orders/history">
+          <Link className="button secondary" href={withCurrentContext('/orders/history')}>
             <i className="fi fi-rr-ballot" aria-hidden />
             Riwayat
           </Link>
@@ -478,11 +502,11 @@ export function CustomerPaymentInfo({ profile }: Props) {
             <div className="empty-state compact">
               <i className="fi fi-rr-badge-check" aria-hidden />
               <strong>Tidak ada tagihan aktif</strong>
-              <span>Order lunas atau selesai akan tetap bisa dilihat di riwayat.</span>
+              <span>Order lunas atau belum punya harga final tetap bisa dilihat di riwayat.</span>
             </div>
           ) : null}
 
-          {unpaidOrders.map((order) => {
+          {billableOrders.map((order) => {
             const canPayOrder = isPayableOrder(order);
 
             return (
@@ -511,13 +535,39 @@ export function CustomerPaymentInfo({ profile }: Props) {
                           ? 'BFF Belum Siap'
                           : paymentActionLabel(order)}
                 </button>
-                <Link className="button secondary" href={`/orders/${order.id}/chat`}>
+                <Link className="button secondary" href={withCurrentContext(`/orders/${order.id}/chat`)}>
                   <i className="fi fi-rr-comment-alt" aria-hidden />
                   Chat Order
                 </Link>
               </article>
             );
           })}
+
+          {pendingPriceOrders.length > 0 ? (
+            <div className="pending-price-list" aria-label="Order menunggu harga final">
+              <p className="eyebrow">Menunggu harga final</p>
+              {pendingPriceOrders.map((order) => (
+                <article className="bill-card muted" key={order.id}>
+                  <div>
+                    <strong>#{order.id.slice(0, 8)}</strong>
+                    <span>{order.format_detail?.paket || 'Laundry order'} - {order.format_detail?.outlet_name || 'Outlet'}</span>
+                    <span className={paymentStatusClass(order.status_pembayaran)}>
+                      {paymentStatusLabel(order.status_pembayaran)}
+                    </span>
+                  </div>
+                  <strong>Harga belum final</strong>
+                  <button className="button secondary" disabled type="button">
+                    <i className="fi fi-rr-clock-three" aria-hidden />
+                    Menunggu Admin
+                  </button>
+                  <Link className="button secondary" href={withCurrentContext(`/orders/${order.id}/chat`)}>
+                    <i className="fi fi-rr-comment-alt" aria-hidden />
+                    Chat Order
+                  </Link>
+                </article>
+              ))}
+            </div>
+          ) : null}
         </div>
       </section>
 

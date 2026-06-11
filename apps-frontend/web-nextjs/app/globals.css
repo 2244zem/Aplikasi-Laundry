@@ -5309,3 +5309,363 @@ body {
 .device-android .customer-timeline div {
   min-height: 54px;
 }
+
+/* Customer journey polish: order wizard, tracking, payment */
+.device-frame:has(.order-layout),
+.device-frame:has(.history-screen),
+.device-frame:has(.payment-screen),
+.device-frame:has(.payment-result-screen),
+.device-frame:has(.customer-chat-screen) {
+  --customer-ink: #1C1924;
+  --customer-plum: #4A3B69;
+  --customer-muted: #8E8A9A;
+  --customer-lilac: #E8E2F4;
+  --customer-canvas: #FAFAFA;
+  --customer-paper: #FFFFFF;
+  --customer-line: rgba(74, 59, 105, 0.12);
+  --customer-shadow: 0 10px 40px -10px rgba(74, 59, 105, 0.08);
+}
+
+.device-frame:has(.order-layout) .app-shell,
+.device-frame:has(.history-screen) .app-shell,
+.device-frame:has(.payment-screen) .app-shell,
+.device-frame:has(.payment-result-screen) .app-shell,
+.device-frame:has(.customer-chat-screen) .app-shell {
+  background: var(--customer-canvas);
+  color: var(--customer-ink);
+}
+
+.device-frame:has(.order-layout) .topbar,
+.device-frame:has(.history-screen) .topbar,
+.device-frame:has(.payment-screen) .topbar,
+.device-frame:has(.payment-result-screen) .topbar,
+.device-frame:has(.customer-chat-screen) .topbar {
+  background: rgba(250, 250, 250, 0.96);
+  border-bottom-color: var(--customer-line);
+}
+
+.device-frame:has(.order-layout) .brand,
+.device-frame:has(.history-screen) .brand,
+.device-frame:has(.payment-screen) .brand,
+.device-frame:has(.payment-result-screen) .brand,
+.device-frame:has(.customer-chat-screen) .brand,
+.device-frame:has(.order-layout) .nav-link,
+.device-frame:has(.history-screen) .nav-link,
+.device-frame:has(.payment-screen) .nav-link,
+.device-frame:has(.payment-result-screen) .nav-link,
+.device-frame:has(.customer-chat-screen) .nav-link,
+.device-frame:has(.order-layout) .language-toggle,
+.device-frame:has(.history-screen) .language-toggle,
+.device-frame:has(.payment-screen) .language-toggle,
+.device-frame:has(.payment-result-screen) .language-toggle,
+.device-frame:has(.customer-chat-screen) .language-toggle {
+  color: var(--customer-plum);
+}
+
+.device-frame:has(.order-layout) .brand-mark,
+.device-frame:has(.history-screen) .brand-mark,
+.device-frame:has(.payment-screen) .brand-mark,
+.device-frame:has(.payment-result-screen) .brand-mark,
+.device-frame:has(.customer-chat-screen) .brand-mark,
+.device-frame:has(.order-layout) .nav-link.active,
+.device-frame:has(.history-screen) .nav-link.active,
+.device-frame:has(.payment-screen) .nav-link.active,
+.device-frame:has(.payment-result-screen) .nav-link.active,
+.device-frame:has(.customer-chat-screen) .nav-link.active,
+.device-frame:has(.order-layout) .mobile-tab.active,
+.device-frame:has(.history-screen) .mobile-tab.active,
+.device-frame:has(.payment-screen) .mobile-tab.active,
+.device-frame:has(.payment-result-screen) .mobile-tab.active,
+.device-frame:has(.customer-chat-screen) .mobile-tab.active {
+  background: var(--customer-lilac);
+  color: var(--customer-plum);
+}
+
+.order-layout .app-card,
+.history-screen .app-card,
+.payment-screen .app-card,
+.payment-result-screen .app-card,
+.customer-chat-screen .chat-shell,
+.customer-chat-screen .chat-status-card,
+.order-layout .panel,
+.history-screen .panel,
+.payment-screen .panel,
+.payment-result-screen .panel {
+  background: var(--customer-paper, #FFFFFF);
+  border: 1px solid var(--customer-line, rgba(74, 59, 105, 0.12));
+  border-radius: 24px;
+  box-shadow: var(--customer-shadow, 0 10px 40px -10px rgba(74, 59, 105, 0.08));
+}
+
+.order-layout .button,
+.history-screen .button,
+.payment-screen .button,
+.payment-result-screen .button,
+.customer-chat-screen .button {
+  border-radius: 999px;
+  min-height: 46px;
+}
+
+.order-layout .button.primary,
+.history-screen .button.primary,
+.payment-screen .button.primary,
+.payment-result-screen .button.primary,
+.customer-chat-screen .button.primary {
+  background: var(--customer-plum, #4A3B69);
+  border-color: var(--customer-plum, #4A3B69);
+  box-shadow: 0 14px 30px -18px rgba(74, 59, 105, 0.38);
+}
+
+.order-layout .button.secondary,
+.history-screen .button.secondary,
+.payment-screen .button.secondary,
+.payment-result-screen .button.secondary,
+.customer-chat-screen .button.secondary {
+  background: #FFFFFF;
+  border-color: var(--customer-line, rgba(74, 59, 105, 0.12));
+  color: var(--customer-plum, #4A3B69);
+}
+
+.order-wizard {
+  gap: 18px;
+}
+
+.wizard-steps {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.wizard-steps button {
+  background: #FFFFFF;
+  border: 1px solid var(--customer-line, rgba(74, 59, 105, 0.12));
+  border-radius: 22px;
+  color: var(--customer-muted, #8E8A9A);
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  padding: 14px;
+  text-align: left;
+}
+
+.wizard-steps button span {
+  align-items: center;
+  background: #F6F1FF;
+  border-radius: 999px;
+  color: var(--customer-plum, #4A3B69);
+  display: inline-flex;
+  font-weight: 800;
+  height: 30px;
+  justify-content: center;
+  width: 30px;
+}
+
+.wizard-steps button strong {
+  color: var(--customer-plum, #4A3B69);
+  font-size: 15px;
+}
+
+.wizard-steps button small {
+  line-height: 1.35;
+}
+
+.wizard-steps button.active {
+  border-color: rgba(74, 59, 105, 0.32);
+  box-shadow: var(--customer-shadow, 0 10px 40px -10px rgba(74, 59, 105, 0.08));
+}
+
+.wizard-steps button.done span {
+  background: var(--customer-plum, #4A3B69);
+  color: #FFFFFF;
+}
+
+.wizard-panel {
+  display: grid;
+  gap: 16px;
+}
+
+.wizard-panel-head {
+  align-items: flex-start;
+  display: flex;
+  gap: 14px;
+  justify-content: space-between;
+}
+
+.wizard-panel-head h2 {
+  color: var(--customer-plum, #4A3B69);
+  font-size: 24px;
+  line-height: 1.15;
+  margin: 3px 0;
+}
+
+.preference-pills,
+.wizard-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.preference-pills button {
+  background: #FFFFFF;
+  border: 1px solid var(--customer-line, rgba(74, 59, 105, 0.12));
+  border-radius: 999px;
+  color: var(--customer-plum, #4A3B69);
+  font-weight: 800;
+  min-height: 42px;
+  padding: 0 16px;
+}
+
+.preference-pills button.active {
+  background: var(--customer-lilac, #E8E2F4);
+  border-color: rgba(74, 59, 105, 0.18);
+}
+
+.summary-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.summary-grid span {
+  background: #FFFFFF;
+  border: 1px solid var(--customer-line, rgba(74, 59, 105, 0.12));
+  border-radius: 20px;
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  padding: 14px;
+}
+
+.summary-grid i {
+  align-items: center;
+  background: var(--customer-lilac, #E8E2F4);
+  border-radius: 16px;
+  color: var(--customer-plum, #4A3B69);
+  display: inline-flex;
+  height: 38px;
+  justify-content: center;
+  width: 38px;
+}
+
+.summary-grid strong {
+  color: var(--customer-plum, #4A3B69);
+  overflow-wrap: anywhere;
+}
+
+.summary-grid small {
+  color: var(--customer-muted, #8E8A9A);
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.price-summary {
+  align-items: center;
+  background: #F6F1FF;
+  border: 1px solid rgba(74, 59, 105, 0.1);
+  border-radius: 22px;
+  display: flex;
+  justify-content: space-between;
+  padding: 16px 18px;
+}
+
+.price-summary span {
+  color: var(--customer-muted, #8E8A9A);
+  font-weight: 800;
+}
+
+.price-summary strong {
+  color: var(--customer-plum, #4A3B69);
+  font-size: 24px;
+}
+
+.customer-timeline.compact {
+  grid-template-columns: 1fr;
+}
+
+.customer-timeline.compact div {
+  min-height: 46px;
+}
+
+.customer-timeline.compact p {
+  font-size: 13px;
+  margin-top: 7px;
+}
+
+.chat-timeline {
+  margin: 14px 0;
+}
+
+.pending-price-list {
+  border-top: 1px solid var(--customer-line, rgba(74, 59, 105, 0.12));
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+  padding-top: 16px;
+}
+
+.bill-card.muted {
+  opacity: 0.82;
+}
+
+.bill-card.muted .button[disabled],
+.history-order-card .button[disabled] {
+  cursor: not-allowed;
+  opacity: 0.72;
+}
+
+.payment-result-hero {
+  align-items: center;
+  border-radius: 28px;
+}
+
+.payment-result-hero h1 {
+  color: var(--customer-plum, #4A3B69);
+}
+
+.payment-result-icon {
+  background: var(--customer-lilac, #E8E2F4);
+  color: var(--customer-plum, #4A3B69);
+}
+
+.payment-result-hero.done .payment-result-icon {
+  background: #E7F6EF;
+  color: #2F7D63;
+}
+
+.payment-result-hero.failed .payment-result-icon {
+  background: #FBEAEC;
+  color: #A8424A;
+}
+
+.device-android .wizard-steps {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.device-android .wizard-steps button {
+  flex: 0 0 74%;
+  padding: 12px;
+  scroll-snap-align: start;
+}
+
+.device-android .wizard-panel-head,
+.device-android .price-summary {
+  align-items: stretch;
+  flex-direction: column;
+}
+
+.device-android .summary-grid,
+.device-android .customer-timeline.compact {
+  grid-template-columns: 1fr;
+}
+
+.device-android .wizard-actions {
+  display: grid;
+  grid-template-columns: 1fr;
+}
+
+.device-android .order-side {
+  gap: 12px;
+}

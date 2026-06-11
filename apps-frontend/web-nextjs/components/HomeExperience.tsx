@@ -212,13 +212,13 @@ export function HomeExperience() {
           </h1>
           <p className="muted">{t.body}</p>
           <div className="actions hero-actions">
-            <Link className="button primary" href="/orders/new">
+            <Link className="button primary" href={withCurrentContext('/orders/new')}>
               <span className="motion-icon">
                 <i className="fi fi-rr-add-document" aria-hidden />
               </span>
               {t.order}
             </Link>
-            <Link className="button secondary" href="/orders/history">
+            <Link className="button secondary" href={withCurrentContext('/orders/history')}>
               <span className="motion-icon">
                 <i className="fi fi-rr-ballot" aria-hidden />
               </span>
@@ -250,7 +250,7 @@ export function HomeExperience() {
           </div>
 
           {workflowCards[language].map((card) => (
-            <Link className="workflow-card" href={card.href} key={card.title}>
+            <Link className="workflow-card" href={withCurrentContext(card.href)} key={card.title}>
               <span>
                 <i className={`fi ${card.icon}`} aria-hidden />
               </span>
@@ -269,7 +269,7 @@ export function HomeExperience() {
           <p className="eyebrow">{t.nearby}</p>
           <h2>{t.nearbyTitle}</h2>
         </div>
-        <Link className="button secondary" href="/orders/new">
+        <Link className="button secondary" href={withCurrentContext('/orders/new')}>
           <i className="fi fi-rr-location-crosshairs" aria-hidden />
           {t.findOutlet}
         </Link>

@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import { ListSkeleton, MetricSkeleton } from '@/components/Skeleton';
 import { paymentStatusClass, paymentStatusLabel } from '@/lib/paymentStatus';
@@ -51,6 +52,7 @@ function isDone(order: LaundryOrder) {
 }
 
 export function CustomerOrderHistory({ profile }: Props) {
+  const searchParams = useSearchParams();
   const [orders, setOrders] = useState<LaundryOrder[]>([]);
   const [filter, setFilter] = useState<HistoryFilter>('ALL');
   const [loading, setLoading] = useState(true);
@@ -75,6 +77,20 @@ export function CustomerOrderHistory({ profile }: Props) {
 
     return { active, total, unpaid };
   }, [orders]);
+
+  function withCurrentContext(href: string) {
+    const [path, query = ''] = href.split('?');
+    const params = new URLSearchParams(query);
+
+    ['isandroid', 'istablet', 'isdesktop', 'lang'].forEach((key) => {
+      if (searchParams.has(key) && !params.has(key)) {
+        params.set(key, searchParams.get(key) ?? '');
+      }
+    });
+
+    const nextQuery = params.toString();
+    return `${path}${nextQuery ? `?${nextQuery}` : ''}`;
+  }
 
   useEffect(() => {
     let mounted = true;
@@ -149,7 +165,7 @@ export function CustomerOrderHistory({ profile }: Props) {
             <h1>Riwayat order yang live.</h1>
             <p className="muted">Semua perubahan admin masuk realtime, termasuk status kerja dan pembayaran.</p>
           </div>
-          <Link className="button primary" href="/orders/new">
+          <Link className="button primary" href={withCurrentContext('/orders/new')}>
             <i className="fi fi-rr-add-document" aria-hidden />
             Order Baru
           </Link>
@@ -259,24 +275,33 @@ export function CustomerOrderHistory({ profile }: Props) {
                   </span>
                 </div>
 
-                <div className="status-rail" aria-label="Progress order">
+                <div className="customer-timeline compact" aria-label="Progress order">
                   {orderSteps.map((status, index) => (
-                    <span className={!isCancelled && index <= stepIndex ? 'active' : ''} key={status}>
-                      {statusLabel(status)}
-                    </span>
+                    <div className={!isCancelled && index <= stepIndex ? 'active' : ''} key={status}>
+                      <span>
+                        <i className={!isCancelled && index <= stepIndex ? 'fi fi-rr-check' : 'fi fi-rr-circle'} aria-hidden />
+                      </span>
+                      <p>{statusLabel(status)}</p>
+                    </div>
                   ))}
                 </div>
 
                 <div className="actions">
-                  <Link className="button secondary" href={`/orders/${order.id}/chat`}>
+                  <Link className="button secondary" href={withCurrentContext(`/orders/${order.id}/chat`)}>
                     <i className="fi fi-rr-comment-alt" aria-hidden />
                     Chat & Status
                   </Link>
-                  {order.status_pembayaran !== 'PAID' ? (
-                    <Link className="button primary" href="/orders/payment">
+                  {order.status_pembayaran !== 'PAID' && Number(order.total_harga || 0) >= 1000 ? (
+                    <Link className="button primary" href={withCurrentContext('/orders/payment')}>
                       <i className="fi fi-rr-credit-card" aria-hidden />
                       Bayar
                     </Link>
+                  ) : null}
+                  {order.status_pembayaran !== 'PAID' && Number(order.total_harga || 0) < 1000 ? (
+                    <button className="button secondary" disabled type="button">
+                      <i className="fi fi-rr-clock-three" aria-hidden />
+                      Menunggu harga
+                    </button>
                   ) : null}
                 </div>
               </article>

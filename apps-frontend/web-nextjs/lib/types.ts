@@ -32,6 +32,7 @@ export type LaundryOrderDetail = {
   alamat?: string;
   estimasi_pakaian?: number;
   catatan?: string;
+  preferensi_parfum?: string;
   pickup_time?: string;
   customer_latitude?: number;
   customer_longitude?: number;

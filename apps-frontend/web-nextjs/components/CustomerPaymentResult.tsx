@@ -76,6 +76,20 @@ export function CustomerPaymentResult({ profile }: Props) {
   const [syncing, setSyncing] = useState(false);
   const copy = useMemo(() => resultCopy(order), [order]);
 
+  function withCurrentContext(href: string) {
+    const [path, query = ''] = href.split('?');
+    const params = new URLSearchParams(query);
+
+    ['isandroid', 'istablet', 'isdesktop', 'lang'].forEach((key) => {
+      if (searchParams.has(key) && !params.has(key)) {
+        params.set(key, searchParams.get(key) ?? '');
+      }
+    });
+
+    const nextQuery = params.toString();
+    return `${path}${nextQuery ? `?${nextQuery}` : ''}`;
+  }
+
   const syncOrderStatus = useCallback(async (orderId: string) => {
     setSyncing(true);
 
@@ -214,14 +228,20 @@ export function CustomerPaymentResult({ profile }: Props) {
         ) : null}
 
         <div className="actions">
-          <Link className="button primary" href="/orders/history">
+          <Link className="button primary" href={withCurrentContext('/orders/history')}>
             <i className="fi fi-rr-ballot" aria-hidden />
             Lihat Riwayat
           </Link>
-          <Link className="button secondary" href="/orders/payment">
+          <Link className="button secondary" href={withCurrentContext('/orders/payment')}>
             <i className="fi fi-rr-credit-card" aria-hidden />
             Buka Tagihan
           </Link>
+          {order ? (
+            <Link className="button secondary" href={withCurrentContext(`/orders/${order.id}/chat`)}>
+              <i className="fi fi-rr-comment-alt" aria-hidden />
+              Chat Outlet
+            </Link>
+          ) : null}
           {order?.status_pembayaran === 'PENDING' && order.midtrans_order_id ? (
             <button className="button secondary" disabled={syncing} onClick={() => syncOrderStatus(order.id)} type="button">
               <i className="fi fi-rr-refresh" aria-hidden />

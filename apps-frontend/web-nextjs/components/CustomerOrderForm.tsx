@@ -2,6 +2,7 @@
 
 import type { CSSProperties } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import { ListSkeleton } from '@/components/Skeleton';
 import { supabase } from '@/lib/supabaseClient';
@@ -42,6 +43,8 @@ type ServiceChoice = Pick<ServicePricing, 'aktif' | 'deskripsi' | 'estimasi_meni
   icon: string;
 };
 
+type WizardStep = 1 | 2 | 3;
+
 const fallbackServicePrices: ServiceChoice[] = [
   { aktif: true, deskripsi: 'Cuci, kering, dan setrika rapi', estimasi_menit: 1440, harga: 8000, icon: 'fi-rr-washer', id: 'fallback-cuci-setrika', nama_layanan: 'Cuci Setrika', satuan: 'kg' },
   { aktif: true, deskripsi: 'Cuci dan lipat reguler', estimasi_menit: 1440, harga: 6000, icon: 'fi-rr-water', id: 'fallback-cuci-kering', nama_layanan: 'Cuci Kering', satuan: 'kg' },
@@ -50,6 +53,13 @@ const fallbackServicePrices: ServiceChoice[] = [
 ];
 
 const orderSteps: LaundryOrder['status_order'][] = ['PENDING_CONFIRMATION', 'DITERIMA', 'DICUCI', 'DISETRIKA', 'SELESAI'];
+const fragranceOptions = ['Lavender', 'Ocean Breeze', 'Tanpa parfum'];
+
+const wizardLabels = [
+  { body: 'Outlet dan layanan', label: 'Pilih' },
+  { body: 'Alamat, waktu, preferensi', label: 'Detail' },
+  { body: 'Cek ulang sebelum kirim', label: 'Ringkasan' },
+] as const;
 
 function isActiveOutlet(outlet: OutletProfile) {
   if (outlet.role === 'SUPERADMIN') {
@@ -106,6 +116,32 @@ function serviceIcon(serviceName: string) {
   return 'fi-rr-washer';
 }
 
+function serviceMatchesIntent(service: ServiceChoice, intent: string) {
+  const normalized = `${service.nama_layanan} ${service.deskripsi ?? ''}`.toLowerCase();
+
+  if (intent === 'premium') {
+    return normalized.includes('premium') || normalized.includes('satuan') || normalized.includes('dry') || normalized.includes('jas') || normalized.includes('gaun');
+  }
+
+  if (intent === 'sepatu') {
+    return normalized.includes('sepatu') || normalized.includes('shoe');
+  }
+
+  if (intent === 'cuci-kiloan') {
+    return normalized.includes('kilo') || normalized.includes('cuci') || service.satuan === 'kg';
+  }
+
+  return false;
+}
+
+function pickServiceFromIntent(services: ServiceChoice[], intent: string | null) {
+  if (!intent) {
+    return services[0]?.id || '';
+  }
+
+  return services.find((service) => serviceMatchesIntent(service, intent))?.id || services[0]?.id || '';
+}
+
 function buildInitialChatMessage(order: LaundryOrder) {
   const detail = order.format_detail ?? {};
   const price = Number(order.total_harga || detail.estimasi_harga || 0);
@@ -119,6 +155,7 @@ function buildInitialChatMessage(order: LaundryOrder) {
     `Estimasi: ${detail.estimasi_pakaian ?? '-'} ${detail.satuan || 'pcs'}`,
     `Alamat: ${detail.alamat || '-'}`,
     `Pickup: ${detail.pickup_time || 'Fleksibel'}`,
+    detail.preferensi_parfum ? `Preferensi: ${detail.preferensi_parfum}` : '',
     `Estimasi harga: ${formatCurrency(price)}`,
     detail.catatan ? `Catatan: ${detail.catatan}` : '',
     '',
@@ -160,10 +197,14 @@ function upsertOrderList(currentOrders: LaundryOrder[], nextOrder: LaundryOrder)
 }
 
 export function CustomerOrderForm({ profile }: Props) {
+  const searchParams = useSearchParams();
+  const serviceIntent = searchParams.get('service');
   const [selectedServiceId, setSelectedServiceId] = useState(fallbackServicePrices[0].id);
+  const [wizardStep, setWizardStep] = useState<WizardStep>(1);
   const [estimasiPakaian, setEstimasiPakaian] = useState(12);
   const [alamat, setAlamat] = useState('');
   const [pickupTime, setPickupTime] = useState('');
+  const [preferensiParfum, setPreferensiParfum] = useState(fragranceOptions[0]);
   const [catatan, setCatatan] = useState('');
   const [outlets, setOutlets] = useState<OutletProfile[]>([]);
   const [servicePrices, setServicePrices] = useState<ServiceChoice[]>(fallbackServicePrices);
@@ -192,6 +233,10 @@ export function CustomerOrderForm({ profile }: Props) {
     () => Math.max(0, estimasiPakaian) * Number(selectedService?.harga || 0),
     [estimasiPakaian, selectedService?.harga],
   );
+  const selectedRange = selectedOutlet ? distanceKm(location, selectedOutlet) : null;
+  const canContinueStepOne = Boolean(selectedOutlet && selectedService && selectedOutlet.outlet_is_open)
+    && (!location || selectedRange == null || selectedRange <= Number(selectedOutlet?.outlet_radius_km || radiusFilterKm));
+  const canContinueStepTwo = Boolean(alamat.trim());
 
   const sortedOutlets = useMemo(() => {
     return [...outlets]
@@ -261,8 +306,9 @@ export function CustomerOrderForm({ profile }: Props) {
 
     async function loadServicePrices() {
       if (!selectedOutletId) {
+        setLoadingPrices(false);
         setServicePrices(fallbackServicePrices);
-        setSelectedServiceId(fallbackServicePrices[0].id);
+        setSelectedServiceId(pickServiceFromIntent(fallbackServicePrices, serviceIntent));
         return;
       }
 
@@ -295,7 +341,7 @@ export function CustomerOrderForm({ profile }: Props) {
       }));
       const nextPrices = mappedPrices.length > 0 ? mappedPrices : fallbackServicePrices;
       setServicePrices(nextPrices);
-      setSelectedServiceId(nextPrices[0].id);
+      setSelectedServiceId(pickServiceFromIntent(nextPrices, serviceIntent));
     }
 
     void loadServicePrices();
@@ -303,7 +349,7 @@ export function CustomerOrderForm({ profile }: Props) {
     return () => {
       mounted = false;
     };
-  }, [selectedOutletId]);
+  }, [selectedOutletId, serviceIntent]);
 
   useEffect(() => {
     let mounted = true;
@@ -391,6 +437,41 @@ export function CustomerOrderForm({ profile }: Props) {
     );
   }
 
+  function withCurrentContext(href: string) {
+    const [path, query = ''] = href.split('?');
+    const params = new URLSearchParams(query);
+
+    ['isandroid', 'istablet', 'isdesktop', 'lang'].forEach((key) => {
+      if (searchParams.has(key) && !params.has(key)) {
+        params.set(key, searchParams.get(key) ?? '');
+      }
+    });
+
+    const nextQuery = params.toString();
+    return `${path}${nextQuery ? `?${nextQuery}` : ''}`;
+  }
+
+  function goToNextStep() {
+    setMessage('');
+
+    if (wizardStep === 1 && !canContinueStepOne) {
+      setMessage(!selectedOutlet ? 'Pilih outlet laundry dulu.' : 'Outlet belum bisa menerima pickup. Pilih outlet yang buka dan masuk radius layanan.');
+      return;
+    }
+
+    if (wizardStep === 2 && !canContinueStepTwo) {
+      setMessage('Isi alamat pickup dulu agar outlet bisa menjemput pakaian.');
+      return;
+    }
+
+    setWizardStep((currentStep) => (Math.min(3, currentStep + 1) as WizardStep));
+  }
+
+  function goToPreviousStep() {
+    setMessage('');
+    setWizardStep((currentStep) => (Math.max(1, currentStep - 1) as WizardStep));
+  }
+
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!selectedOutlet) {
@@ -434,6 +515,7 @@ export function CustomerOrderForm({ profile }: Props) {
           alamat,
           pickup_time: pickupTime,
           catatan,
+          preferensi_parfum: preferensiParfum,
           customer_latitude: location?.latitude,
           customer_longitude: location?.longitude,
           outlet_name: outletName(selectedOutlet),
@@ -471,6 +553,7 @@ export function CustomerOrderForm({ profile }: Props) {
     setAlamat('');
     setCatatan('');
     setPickupTime('');
+    setWizardStep(1);
   }
 
   return (
@@ -487,145 +570,263 @@ export function CustomerOrderForm({ profile }: Props) {
           </span>
         </div>
 
-        <form className="form-grid" onSubmit={handleSubmit}>
-          <div className="service-picker" aria-label="Pilih paket laundry">
-            {servicePrices.map((service) => (
-              <button
-                className={`service-option ${selectedServiceId === service.id ? 'active' : ''}`}
-                key={service.id}
-                onClick={() => setSelectedServiceId(service.id)}
-                type="button"
-              >
-                <i className={`fi ${service.icon}`} aria-hidden />
-                <strong>{service.nama_layanan}</strong>
-                <span>{formatCurrency(Number(service.harga))}/{service.satuan} - {formatEta(Number(service.estimasi_menit))}</span>
-              </button>
-            ))}
-          </div>
-          {loadingPrices ? <p className="form-note">Memuat harga layanan outlet...</p> : null}
+        <form className="form-grid order-wizard" onSubmit={handleSubmit}>
+          <div className="wizard-steps" aria-label="Tahap pemesanan">
+            {wizardLabels.map((step, index) => {
+              const stepNumber = (index + 1) as WizardStep;
 
-          <div className="location-strip">
-            <div>
-              <strong>Aktifkan lokasi</strong>
-              <span>{location ? 'Urutan outlet memakai jarak dari posisimu.' : 'Cari laundry aktif terdekat.'}</span>
-            </div>
-            <button className="button secondary" onClick={requestLocation} type="button">
-              <span className="motion-icon">
-                <i className="fi fi-rr-location-crosshairs" aria-hidden />
-              </span>
-              Pakai lokasi
-            </button>
-          </div>
-          {locationMessage ? <p className="form-note">{locationMessage}</p> : null}
-
-          <div className="radius-filter" aria-label="Filter radius laundry">
-            {[3, 5, 10, 20].map((radius) => (
-              <button
-                className={radiusFilterKm === radius ? 'active' : ''}
-                key={radius}
-                onClick={() => setRadiusFilterKm(radius)}
-                type="button"
-              >
-                {radius} km
-              </button>
-            ))}
+              return (
+                <button
+                  aria-current={wizardStep === stepNumber ? 'step' : undefined}
+                  className={wizardStep === stepNumber ? 'active' : wizardStep > stepNumber ? 'done' : ''}
+                  key={step.label}
+                  onClick={() => setWizardStep(stepNumber)}
+                  type="button"
+                >
+                  <span>{stepNumber}</span>
+                  <strong>{step.label}</strong>
+                  <small>{step.body}</small>
+                </button>
+              );
+            })}
           </div>
 
-          <div className="field">
-            <span>Laundry terdekat</span>
-            <div className="outlet-list">
-              {loadingOutlets ? <ListSkeleton count={2} /> : null}
-              {!loadingOutlets && sortedOutlets.length === 0 ? (
-                <div className="empty-state">
-                  <i className="fi fi-rr-store-alt" aria-hidden />
-                  <strong>Belum ada outlet aktif</strong>
-                  <span>Aktifkan membership admin dan isi profil outlet dulu.</span>
+          {wizardStep === 1 ? (
+            <div className="wizard-panel">
+              <div className="wizard-panel-head">
+                <div>
+                  <p className="eyebrow">Tahap 1</p>
+                  <h2>Pilih outlet dan layanan.</h2>
+                  <p className="muted">Order hanya masuk ke outlet yang kamu pilih.</p>
                 </div>
-              ) : null}
+                <span className="status pending">{sortedOutlets.length} outlet</span>
+              </div>
 
-              {sortedOutlets.map((outlet) => {
-                const range = distanceKm(location, outlet);
-                const isSelected = selectedOutletId === outlet.id;
-                const isOpen = outlet.outlet_is_open;
-
-                return (
+              <div className="service-picker" aria-label="Pilih paket laundry">
+                {servicePrices.map((service) => (
                   <button
-                    className={`outlet-card ${isSelected ? 'active' : ''} ${isOpen ? '' : 'disabled'}`}
-                    key={outlet.id}
-                    onClick={() => setSelectedOutletId(outlet.id)}
+                    className={`service-option ${selectedServiceId === service.id ? 'active' : ''}`}
+                    key={service.id}
+                    onClick={() => setSelectedServiceId(service.id)}
                     type="button"
                   >
-                    <span className="outlet-logo">
-                      <i className="fi fi-rr-washer" aria-hidden />
-                    </span>
-                    <span>
-                      <strong>{outletName(outlet)}</strong>
-                      <small>{outlet.alamat_toko || outlet.email}</small>
-                      <em>
-                        {range == null ? 'Lokasi belum diset' : `${range.toFixed(1)} km`}
-                        {' - '}
-                        {isOpen ? `Buka - ETA ${outlet.outlet_pickup_eta_minutes || 30} menit` : 'Tutup'}
-                        {' - '}
-                        {Number(outlet.outlet_rating || 4.8).toFixed(1)} rating
-                      </em>
-                    </span>
-                    <i className={`fi ${isSelected ? 'fi-sr-badge-check' : 'fi-rr-angle-small-right'}`} aria-hidden />
+                    <i className={`fi ${service.icon}`} aria-hidden />
+                    <strong>{service.nama_layanan}</strong>
+                    <span>{formatCurrency(Number(service.harga))}/{service.satuan} - {formatEta(Number(service.estimasi_menit))}</span>
                   </button>
-                );
-              })}
+                ))}
+              </div>
+              {loadingPrices ? <p className="form-note">Memuat harga layanan outlet...</p> : null}
+
+              <div className="location-strip">
+                <div>
+                  <strong>Aktifkan lokasi</strong>
+                  <span>{location ? 'Urutan outlet memakai jarak dari posisimu.' : 'Cari laundry aktif terdekat.'}</span>
+                </div>
+                <button className="button secondary" onClick={requestLocation} type="button">
+                  <span className="motion-icon">
+                    <i className="fi fi-rr-location-crosshairs" aria-hidden />
+                  </span>
+                  Pakai lokasi
+                </button>
+              </div>
+              {locationMessage ? <p className="form-note">{locationMessage}</p> : null}
+
+              <div className="radius-filter" aria-label="Filter radius laundry">
+                {[3, 5, 10, 20].map((radius) => (
+                  <button
+                    className={radiusFilterKm === radius ? 'active' : ''}
+                    key={radius}
+                    onClick={() => setRadiusFilterKm(radius)}
+                    type="button"
+                  >
+                    {radius} km
+                  </button>
+                ))}
+              </div>
+
+              <div className="field">
+                <span>Laundry terdekat</span>
+                <div className="outlet-list">
+                  {loadingOutlets ? <ListSkeleton count={2} /> : null}
+                  {!loadingOutlets && sortedOutlets.length === 0 ? (
+                    <div className="empty-state">
+                      <i className="fi fi-rr-store-alt" aria-hidden />
+                      <strong>Belum ada outlet aktif</strong>
+                      <span>Aktifkan membership admin dan isi profil outlet dulu.</span>
+                    </div>
+                  ) : null}
+
+                  {sortedOutlets.map((outlet) => {
+                    const range = distanceKm(location, outlet);
+                    const isSelected = selectedOutletId === outlet.id;
+                    const isOpen = outlet.outlet_is_open;
+
+                    return (
+                      <button
+                        className={`outlet-card ${isSelected ? 'active' : ''} ${isOpen ? '' : 'disabled'}`}
+                        key={outlet.id}
+                        onClick={() => setSelectedOutletId(outlet.id)}
+                        type="button"
+                      >
+                        <span className="outlet-logo">
+                          <i className="fi fi-rr-washer" aria-hidden />
+                        </span>
+                        <span>
+                          <strong>{outletName(outlet)}</strong>
+                          <small>{outlet.alamat_toko || outlet.email}</small>
+                          <em>
+                            {range == null ? 'Lokasi belum diset' : `${range.toFixed(1)} km`}
+                            {' - '}
+                            {isOpen ? `Buka - ETA ${outlet.outlet_pickup_eta_minutes || 30} menit` : 'Tutup'}
+                            {' - '}
+                            {Number(outlet.outlet_rating || 4.8).toFixed(1)} rating
+                          </em>
+                        </span>
+                        <i className={`fi ${isSelected ? 'fi-sr-badge-check' : 'fi-rr-angle-small-right'}`} aria-hidden />
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
+          ) : null}
+
+          {wizardStep === 2 ? (
+            <div className="wizard-panel">
+              <div className="wizard-panel-head">
+                <div>
+                  <p className="eyebrow">Tahap 2</p>
+                  <h2>Detail pickup dan preferensi.</h2>
+                  <p className="muted">Isi yang penting saja agar outlet bisa langsung bergerak.</p>
+                </div>
+              </div>
+
+              <label className="field">
+                <span>Estimasi {estimateUnit === 'kg' ? 'berat' : 'jumlah'} ({estimateUnit})</span>
+                <input
+                  className="input"
+                  min={1}
+                  onChange={(event) => setEstimasiPakaian(Number(event.target.value))}
+                  required
+                  step={estimateUnit === 'kg' ? '0.1' : '1'}
+                  type="number"
+                  value={estimasiPakaian}
+                />
+              </label>
+
+              <div className="field">
+                <span>Pilih wangi</span>
+                <div className="preference-pills" aria-label="Pilih preferensi parfum">
+                  {fragranceOptions.map((option) => (
+                    <button
+                      className={preferensiParfum === option ? 'active' : ''}
+                      key={option}
+                      onClick={() => setPreferensiParfum(option)}
+                      type="button"
+                    >
+                      {option}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <label className="field">
+                <span>Alamat pickup</span>
+                <textarea
+                  className="textarea"
+                  onChange={(event) => setAlamat(event.target.value)}
+                  placeholder="Contoh: Jl. Melati No. 7, dekat minimarket"
+                  required
+                  value={alamat}
+                />
+              </label>
+
+              <label className="field">
+                <span>Waktu pickup</span>
+                <input
+                  className="input"
+                  onChange={(event) => setPickupTime(event.target.value)}
+                  type="datetime-local"
+                  value={pickupTime}
+                />
+              </label>
+
+              <label className="field">
+                <span>Catatan</span>
+                <textarea
+                  className="textarea"
+                  onChange={(event) => setCatatan(event.target.value)}
+                  placeholder="Pisahkan pakaian putih, lipat rapi, dan lainnya"
+                  value={catatan}
+                />
+              </label>
+            </div>
+          ) : null}
+
+          {wizardStep === 3 ? (
+            <div className="wizard-panel summary-panel">
+              <div className="wizard-panel-head">
+                <div>
+                  <p className="eyebrow">Tahap 3</p>
+                  <h2>Ringkasan sebelum dikirim.</h2>
+                  <p className="muted">Cek outlet, layanan, jadwal, dan harga estimasi.</p>
+                </div>
+                <span className="status pending">Draf</span>
+              </div>
+
+              <div className="summary-grid">
+                <span>
+                  <i className="fi fi-rr-store-alt" aria-hidden />
+                  <strong>{selectedOutlet ? outletName(selectedOutlet) : '-'}</strong>
+                  <small>{selectedOutlet?.alamat_toko || selectedOutlet?.email || 'Outlet belum dipilih'}</small>
+                </span>
+                <span>
+                  <i className={`fi ${selectedService?.icon || 'fi-rr-washer'}`} aria-hidden />
+                  <strong>{selectedService?.nama_layanan || '-'}</strong>
+                  <small>{formatCurrency(Number(selectedService?.harga || 0))}/{estimateUnit}</small>
+                </span>
+                <span>
+                  <i className="fi fi-rr-map-marker-home" aria-hidden />
+                  <strong>{alamat || 'Alamat belum diisi'}</strong>
+                  <small>{pickupTime || 'Pickup fleksibel'}</small>
+                </span>
+                <span>
+                  <i className="fi fi-rr-sparkles" aria-hidden />
+                  <strong>{preferensiParfum}</strong>
+                  <small>{catatan || 'Tidak ada catatan tambahan'}</small>
+                </span>
+              </div>
+
+              <div className="price-summary">
+                <span>Estimasi tagihan</span>
+                <strong>{formatCurrency(estimatedPrice)}</strong>
+              </div>
+            </div>
+          ) : null}
+
+          <div className="wizard-actions">
+            {wizardStep > 1 ? (
+              <button className="button secondary" onClick={goToPreviousStep} type="button">
+                <i className="fi fi-rr-angle-small-left" aria-hidden />
+                Kembali
+              </button>
+            ) : null}
+
+            {wizardStep < 3 ? (
+              <button className="button primary" onClick={goToNextStep} type="button">
+                Lanjut
+                <i className="fi fi-rr-angle-small-right" aria-hidden />
+              </button>
+            ) : (
+              <button className="button primary" disabled={submitting} type="submit">
+                <span className="motion-icon">
+                  <i className="fi fi-rr-paper-plane" aria-hidden />
+                </span>
+                {submitting ? 'Mengirim...' : 'Kirim Order'}
+              </button>
+            )}
           </div>
-
-          <label className="field">
-            <span>Estimasi {estimateUnit === 'kg' ? 'berat' : 'jumlah'} ({estimateUnit})</span>
-            <input
-              className="input"
-              min={1}
-              onChange={(event) => setEstimasiPakaian(Number(event.target.value))}
-              required
-              step={estimateUnit === 'kg' ? '0.1' : '1'}
-              type="number"
-              value={estimasiPakaian}
-            />
-          </label>
-
-          <label className="field">
-            <span>Alamat pickup</span>
-            <textarea
-              className="textarea"
-              onChange={(event) => setAlamat(event.target.value)}
-              placeholder="Contoh: Jl. Melati No. 7, dekat minimarket"
-              required
-              value={alamat}
-            />
-          </label>
-
-          <label className="field">
-            <span>Waktu pickup</span>
-            <input
-              className="input"
-              onChange={(event) => setPickupTime(event.target.value)}
-              type="datetime-local"
-              value={pickupTime}
-            />
-          </label>
-
-          <label className="field">
-            <span>Catatan</span>
-            <textarea
-              className="textarea"
-              onChange={(event) => setCatatan(event.target.value)}
-              placeholder="Pisahkan pakaian putih, parfum soft, dan lainnya"
-              value={catatan}
-            />
-          </label>
-
-          <button className="button primary" disabled={submitting} type="submit">
-            <span className="motion-icon">
-              <i className="fi fi-rr-paper-plane" aria-hidden />
-            </span>
-            {submitting ? 'Mengirim...' : 'Kirim Order'}
-          </button>
         </form>
 
         {message ? (
@@ -636,7 +837,7 @@ export function CustomerOrderForm({ profile }: Props) {
             {createdOrderId ? ` ID: ${createdOrderId.slice(0, 8)}` : ''}
             {createdOrderId ? (
               <div className="alert-actions">
-                <Link className="button secondary" href={`/orders/${createdOrderId}/chat`}>
+                <Link className="button secondary" href={withCurrentContext(`/orders/${createdOrderId}/chat`)}>
                   <i className="fi fi-rr-comment-alt" aria-hidden />
                   Buka Chat & Status
                 </Link>
@@ -673,6 +874,7 @@ export function CustomerOrderForm({ profile }: Props) {
             <p>Outlet: {selectedOutlet ? outletName(selectedOutlet) : '-'}</p>
             <p>Paket: {selectedService?.nama_layanan || '-'}</p>
             <p>Estimasi: {estimasiPakaian} {estimateUnit}</p>
+            <p>Preferensi: {preferensiParfum}</p>
             <p>Harga: {formatCurrency(estimatedPrice)}</p>
             <p>Status: PENDING</p>
           </div>
@@ -709,14 +911,17 @@ export function CustomerOrderForm({ profile }: Props) {
                   <span className={`status ${order.status_order === 'SELESAI' ? 'done' : 'pending'}`}>
                     {orderStatusLabel(order.status_order)}
                   </span>
-                  <div className="status-rail">
+                  <div className="customer-timeline compact">
                     {orderSteps.map((status, index) => (
-                      <span className={index <= currentIndex ? 'active' : ''} key={status}>
-                        {orderStatusLabel(status)}
-                      </span>
+                      <div className={index <= currentIndex ? 'active' : ''} key={status}>
+                        <span>
+                          <i className={index <= currentIndex ? 'fi fi-rr-check' : 'fi fi-rr-circle'} aria-hidden />
+                        </span>
+                        <p>{orderStatusLabel(status)}</p>
+                      </div>
                     ))}
                   </div>
-                  <Link className="button secondary" href={`/orders/${order.id}/chat`}>
+                  <Link className="button secondary" href={withCurrentContext(`/orders/${order.id}/chat`)}>
                     <i className="fi fi-rr-comment-alt" aria-hidden />
                     Chat & detail
                   </Link>
