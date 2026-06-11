@@ -15,6 +15,10 @@ colors:
   success: "#2F7D63"
   warning: "#9A6A22"
   danger: "#A8424A"
+  customerPlum: "#4A3B69"
+  customerLilac: "#E8E2F4"
+  customerInk: "#1C1924"
+  customerMuted: "#8E8A9A"
 typography:
   pageTitle:
     fontFamily: Inter
@@ -72,7 +76,7 @@ components:
 
 Ungu Laundry adalah aplikasi operasional laundry B2B2C: customer membuat order, admin outlet mengelola pesanan, chat, pembayaran, stok, dan finance. UI harus terasa bersih, stabil, dan dipercaya untuk kerja harian, bukan seperti landing page promosi.
 
-Target emosionalnya adalah tenang dan rapi. Palette mint-teal dipakai untuk menurunkan rasa bising visual: warna utama lembut, teks tegas, permukaan terang, dan status mudah discan. Interface tidak boleh membuat user gelisah karena spacing tidak rata, warna terlalu banyak, card bertumpuk, atau teks kepotong.
+Target emosionalnya adalah tenang dan rapi. Palette mint-teal dipakai untuk area operasional admin agar data cepat discan. Untuk pengalaman pelanggan B2C, mode `Customer Concierge` boleh memakai ungu lembut agar terasa seperti layanan premium personal. Interface tidak boleh membuat user gelisah karena spacing tidak rata, warna terlalu banyak, card bertumpuk, atau teks kepotong.
 
 ## Colors
 
@@ -90,14 +94,35 @@ Palette utama tidak berubah:
 | Warning | `#9A6A22` | Pending, menunggu harga, butuh aksi admin |
 | Danger | `#A8424A` | Failed, batal, error |
 
+Customer Concierge tokens:
+
+| Token | Value | Usage |
+| --- | --- | --- |
+| Plum | `#4A3B69` | Customer headline, primary action, active state |
+| Lilac | `#E8E2F4` | Soft selected state, icon container, quiet highlight |
+| Customer ink | `#1C1924` | Body text in customer dashboard |
+| Customer muted | `#8E8A9A` | Helper text, metadata, concierge labels |
+
 Rules:
 
 - Gunakan teal untuk teks penting dan aksi utama.
 - Gunakan mint sebagai highlight, focus ring, selected state, dan skeleton lembut, bukan sebagai background besar.
 - Gunakan putih/paper sebagai mayoritas permukaan agar UI terasa lega.
 - Status semantik boleh memakai success/warning/danger, tetapi tetap dalam tone soft.
-- Hindari menambah ungu, biru terang, neon, beige dominan, glow, dan decorative gradient.
+- Hindari menambah biru terang, neon, beige dominan, glow, dan decorative gradient. Ungu hanya dipakai untuk customer concierge, bukan admin operations.
 - Gradient hanya boleh muncul untuk micro utility yang tidak terbaca sebagai dekorasi, seperti skeleton shimmer atau arrow select CSS.
+
+## Customer Concierge Mode
+
+Customer dashboard harus terasa seperti layanan concierge, bukan form laundry internal.
+
+- Mulai dari sapaan personal dan pertanyaan ringan: `Ada yang bisa kami bantu segarkan hari ini?`.
+- Quick action layanan memakai pill/card besar dengan radius 24px, bukan grid form kaku.
+- Order aktif tampil sebagai floating card ringkas: status, outlet, pickup, chat, dan tombol lacak.
+- Tracking memakai vertical timeline yang mudah dibaca di mobile.
+- Gunakan Plum `#4A3B69` sebagai customer primary, Lilac `#E8E2F4` sebagai aksen lembut, dan paper `#FAFAFA/#FFFFFF` sebagai mayoritas permukaan.
+- Shadow boleh lebih diffused dari admin: `0 10px 40px -10px rgba(74, 59, 105, 0.08)`.
+- Hindari poster, device mockup kosong, gradient besar, dan headline yang terlalu marketing.
 
 ## Typography
 
@@ -114,6 +139,7 @@ Rules:
 - Android memakai satu kolom, padding 14-16px, bottom space cukup untuk tabbar.
 - Admin screen harus dense tetapi tidak sesak: table/list lebih penting daripada dekorasi.
 - Customer order flow harus mudah discan dari atas ke bawah: outlet -> layanan -> lokasi/alamat -> submit -> ringkasan.
+- Customer dashboard flow: greeting -> active order -> quick service -> metrics -> timeline/detail.
 - Landing/home screen harus terasa seperti dashboard entry point, bukan poster. Hero boleh ada, tetapi rendah, compact, dan langsung menyediakan action.
 - Jangan taruh card di dalam card jika tidak perlu. Kalau markup membutuhkan nesting, inner card harus flat: shadow minimal, border lembut.
 - Gunakan grid 8px rhythm: gap 8, 14, 18, 28.
